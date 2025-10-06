@@ -135,13 +135,6 @@ export default function HalloweenMovieSelector({ onNavigateBack }: HalloweenMovi
     return `http://plex.enzolopez.net:32400${path}?X-Plex-Token=5kj8hCXerpUCNp5AxH5V`
   }
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(price)
-  }
-
   const filteredMovies = movies.filter(movie =>
     movie.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     movie.year?.toString().includes(searchTerm) ||
