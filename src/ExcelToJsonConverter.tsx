@@ -74,36 +74,42 @@ export default function ExcelToJsonConverter({ onNavigateBack }: ExcelToJsonConv
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          {/* Navigation Header */}
-          <div className="flex items-center gap-3 mb-6">
-            <button
-              onClick={onNavigateBack}
-              className="flex items-center gap-2 px-3 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Chat
-            </button>
-            <div className="flex items-center gap-3 ml-4">
-              <FileSpreadsheet className="w-8 h-8 text-indigo-600" />
-              <h1 className="text-3xl font-bold text-gray-800">Excel to JSON Converter</h1>
-            </div>
-          </div>
+    <div className="shop-tools-container">
+      {/* Header */}
+      <div className="shop-header">
+        <button
+          onClick={onNavigateBack}
+          className="back-button"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Chat
+        </button>
+        
+        <div className="header-title">
+          <FileSpreadsheet className="w-6 h-6" />
+          <h1>Excel to JSON Converter</h1>
+        </div>
+        
+        <div className="tools-count">
+          Convert Tool
+        </div>
+      </div>
+      
+      <div className="converter-content">
+        <div className="converter-main">
           
-          <div className="mb-6">
-            <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-indigo-300 rounded-lg cursor-pointer bg-indigo-50 hover:bg-indigo-100 transition-colors">
-              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <Upload className="w-12 h-12 text-indigo-500 mb-3" />
-                <p className="mb-2 text-sm text-gray-600">
-                  <span className="font-semibold">Click to upload</span> or drag and drop
+          <div className="upload-section">
+            <label className="upload-area">
+              <div className="upload-content">
+                <Upload className="upload-icon" />
+                <p className="upload-text">
+                  <span>Click to upload</span> or drag and drop
                 </p>
-                <p className="text-xs text-gray-500">Excel files (.xlsx, .xls)</p>
+                <p className="upload-subtext">Excel files (.xlsx, .xls)</p>
               </div>
               <input
                 type="file"
-                className="hidden"
+                className="file-input"
                 accept=".xlsx,.xls"
                 onChange={handleFileUpload}
               />
@@ -111,33 +117,33 @@ export default function ExcelToJsonConverter({ onNavigateBack }: ExcelToJsonConv
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-700">{error}</p>
+            <div className="error-message">
+              <AlertCircle className="error-icon" />
+              <p>{error}</p>
             </div>
           )}
 
           {jsonData && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium text-green-800">Conversion successful!</p>
-                  <p className="text-xs text-green-600 mt-1">
+            <div className="conversion-results">
+              <div className="success-message">
+                <div className="success-info">
+                  <p className="success-title">Conversion successful!</p>
+                  <p className="success-subtitle">
                     Found {sheets.length} sheet{sheets.length !== 1 ? 's' : ''}: {sheets.join(', ')}
                   </p>
                 </div>
                 <button
                   onClick={downloadJson}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  className="download-button"
                 >
                   <Download className="w-4 h-4" />
                   Download JSON
                 </button>
               </div>
 
-              <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-auto">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Preview:</h3>
-                <pre className="text-xs text-gray-600 whitespace-pre-wrap">
+              <div className="preview-section">
+                <h3 className="preview-title">Preview:</h3>
+                <pre className="preview-content">
                   {JSON.stringify(jsonData, null, 2).slice(0, 2000)}
                   {(JSON.stringify(jsonData, null, 2).length > 2000) ? '\n...(truncated)' : ''}
                 </pre>
@@ -146,9 +152,9 @@ export default function ExcelToJsonConverter({ onNavigateBack }: ExcelToJsonConv
           )}
         </div>
 
-        <div className="mt-6 bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3">How it works:</h2>
-          <ul className="text-sm text-gray-600 space-y-2">
+        <div className="instructions-section">
+          <h2 className="instructions-title">How it works:</h2>
+          <ul className="instructions-list">
             <li>• Upload your Excel file (.xlsx or .xls format)</li>
             <li>• Each sheet will become a key in the JSON object</li>
             <li>• Each row becomes a JSON object with column headers as keys</li>

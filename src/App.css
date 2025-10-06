@@ -498,3 +498,200 @@
   margin-bottom: 1rem;
   opacity: 0.5;
 }
+
+/* Excel to JSON Converter Styles */
+.converter-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 2rem;
+  background-color: #f8f9fa;
+  overflow-y: auto;
+}
+
+.converter-main {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.upload-section {
+  margin-bottom: 2rem;
+}
+
+.upload-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 200px;
+  border: 2px dashed #646cff;
+  border-radius: 12px;
+  cursor: pointer;
+  background-color: #f8f9ff;
+  transition: all 0.2s ease;
+}
+
+.upload-area:hover {
+  background-color: #f0f0ff;
+  border-color: #535bf2;
+}
+
+.upload-content {
+  text-align: center;
+}
+
+.upload-icon {
+  width: 48px;
+  height: 48px;
+  color: #646cff;
+  margin-bottom: 1rem;
+}
+
+.upload-text {
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  color: #333;
+}
+
+.upload-text span {
+  font-weight: 600;
+}
+
+.upload-subtext {
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.file-input {
+  display: none;
+}
+
+.error-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  margin-bottom: 2rem;
+  background-color: #ffebee;
+  border: 1px solid #f8bbd9;
+  border-radius: 8px;
+}
+
+.error-icon {
+  width: 20px;
+  height: 20px;
+  color: #c62828;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.error-message p {
+  color: #c62828;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.conversion-results {
+  margin-bottom: 2rem;
+}
+
+.success-message {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  background-color: #e8f5e8;
+  border: 1px solid #c8e6c9;
+  border-radius: 8px;
+}
+
+.success-info {
+  flex: 1;
+}
+
+.success-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #2e7d32;
+  margin: 0 0 0.25rem 0;
+}
+
+.success-subtitle {
+  font-size: 0.75rem;
+  color: #4caf50;
+  margin: 0;
+}
+
+.download-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background-color: #646cff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+}
+
+.download-button:hover {
+  background-color: #535bf2;
+}
+
+.preview-section {
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  padding: 1rem;
+  max-height: 400px;
+  overflow: auto;
+  border: 1px solid #ddd;
+}
+
+.preview-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 0.5rem 0;
+}
+
+.preview-content {
+  font-size: 0.75rem;
+  color: #666;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 0;
+  font-family: 'Courier New', monospace;
+}
+
+.instructions-section {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border: 1px solid #ddd;
+}
+
+.instructions-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 1rem 0;
+}
+
+.instructions-list {
+  font-size: 0.875rem;
+  color: #666;
+  line-height: 1.6;
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.instructions-list li {
+  margin-bottom: 0.5rem;
+}
