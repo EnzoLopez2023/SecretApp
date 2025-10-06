@@ -81,7 +81,7 @@ export default function HalloweenMovieSelector({ onNavigateBack }: HalloweenMovi
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
 
-  const PLEX_URL = 'http://192.168.1.55:32400/library/sections/9/all?X-Plex-Token=5kj8hCXerpUCNp5AxH5V'
+  const PLEX_URL = 'http://plex.enzolopez.net:32400/library/sections/9/all?X-Plex-Token=5kj8hCXerpUCNp5AxH5V'
 
   useEffect(() => {
     fetchMovies()
@@ -132,7 +132,7 @@ export default function HalloweenMovieSelector({ onNavigateBack }: HalloweenMovi
 
   const getImageUrl = (path: string) => {
     if (path.startsWith('http')) return path
-    return `http://192.168.1.55:32400${path}?X-Plex-Token=5kj8hCXerpUCNp5AxH5V`
+    return `http://plex.enzolopez.net:32400${path}?X-Plex-Token=5kj8hCXerpUCNp5AxH5V`
   }
 
   const formatPrice = (price: number) => {
