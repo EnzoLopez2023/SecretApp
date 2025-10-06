@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileSpreadsheet, Package } from 'lucide-react'
+import { FileSpreadsheet, Package, Film } from 'lucide-react'
 import shopData from './assets/MyShop.json'
 import './App.css'
 
@@ -204,9 +204,10 @@ const generateShopContext = (question: string): string => {
 interface ChatAppProps {
   onNavigateToConverter: () => void;
   onNavigateToShop: () => void;
+  onNavigateToHalloween: () => void;
 }
 
-export default function ChatApp({ onNavigateToConverter, onNavigateToShop }: ChatAppProps) {
+export default function ChatApp({ onNavigateToConverter, onNavigateToShop, onNavigateToHalloween }: ChatAppProps) {
   const [question, setQuestion] = useState('')
   const [response, setResponse] = useState('')
   const [loading, setLoading] = useState(false)
@@ -320,6 +321,13 @@ export default function ChatApp({ onNavigateToConverter, onNavigateToShop }: Cha
           >
             <Package className="w-4 h-4" />
             My Shop Tools
+          </button>
+          <button
+            onClick={onNavigateToHalloween}
+            className="nav-button"
+          >
+            <Film className="w-4 h-4" />
+            Halloween Movies
           </button>
         </div>
       </div>
