@@ -21,11 +21,11 @@ interface WoodworkingProjectsProps {
 
 // Configure SharePoint - UPDATE THESE VALUES
 const sharePointConfig = {
-  tenantId: 'YOUR_TENANT_ID',
-  clientId: 'YOUR_CLIENT_ID',
-  clientSecret: 'YOUR_CLIENT_SECRET',
-  siteId: 'YOUR_SITE_ID', // Get from: https://graph.microsoft.com/v1.0/sites/root
-  folderPath: 'WoodworkingProjects'
+  tenantId: import.meta.env.VITE_SHAREPOINT_TENANT_ID,
+  clientId: import.meta.env.VITE_SHAREPOINT_CLIENT_ID,
+  clientSecret: import.meta.env.VITE_SHAREPOINT_CLIENT_SECRET,
+  siteId: import.meta.env.VITE_SHAREPOINT_SITE_ID,
+  folderPath: 'Projects'
 }
 
 const sharePointService = new SharePointService(sharePointConfig)
@@ -294,6 +294,21 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
     alert('Synced with SharePoint!')
   }
 
+  const testConnection = async () => {
+    try {
+      const token = await sharePointService['getAccessToken']()
+      console.log('✅ Token obtained successfully')
+      
+      const driveId = await sharePointService['getDriveId']()
+      console.log('✅ Drive ID:', driveId)
+      
+      alert('SharePoint connection successful!')
+    } catch (error) {
+      console.error('❌ Connection failed:', error)
+      alert('Connection failed: ' + error)
+    }
+  }
+
   const filteredProjects = projects.filter(project =>
     project.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     project.materials?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -349,6 +364,9 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
           </button>
           <button onClick={handleExportBackup} className="back-button" title="Export backup">
             <Download className="w-4 h-4" />
+          </button>
+          <button onClick={testConnection} className="back-button" title="Test SharePoint Connection" style={{ backgroundColor: '#28a745' }}>
+            🔧 Test
           </button>
           <div className="tools-count">
             {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}
