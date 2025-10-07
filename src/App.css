@@ -836,3 +836,46 @@
   border-radius: 15px;
   font-size: 0.875rem;
 }
+
+/* Woodworking Projects Form Styles */
+.project-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #495057;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+}
+
+.form-group textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+.attached-files {
+  display: flex;
+  flex-direction: column;
+}
+
+.files-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.file-preview {
+  display: flex;
+  flex-direction: column;
+}
