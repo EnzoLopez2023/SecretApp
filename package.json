@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:full": "npm run build && xcopy /Y server.js dist\\ && xcopy /Y web.config dist\\ && xcopy /Y package.json dist\\ && xcopy /Y ecosystem.config.cjs dist\\",
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "node server.js",

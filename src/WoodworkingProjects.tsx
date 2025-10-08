@@ -23,7 +23,8 @@ interface WoodworkingProjectsProps {
 const sharePointConfig = {
   siteId: import.meta.env.VITE_SHAREPOINT_SITE_ID,
   folderPath: 'Projects',
-  apiUrl: 'http://localhost:3001/api' // Backend server URL
+  // Use relative URL in production, localhost in development
+  apiUrl: import.meta.env.DEV ? 'http://localhost:3001/api' : '/api'
 }
 
 const sharePointService = new SharePointService(sharePointConfig)
@@ -294,7 +295,8 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
 
   const testConnection = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/test')
+      const apiUrl = import.meta.env.DEV ? 'http://localhost:3001/api' : '/api'
+      const response = await fetch(`${apiUrl}/test`)
       const data = await response.json()
       
       if (data.success) {
