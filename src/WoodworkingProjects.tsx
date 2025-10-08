@@ -1,33 +1,11 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Hammer, Plus, Calendar, FileText, Paperclip, Save, X, Edit2, Trash2, Download, Upload, Cloud } from 'lucide-react'
-import SharePointService from './utils/sharepointService'
+import { ArrowLeft, Hammer, Plus, Calendar, FileText, Paperclip, Save, X, Edit2, Trash2, Download, Upload } from 'lucide-react'
+import projectService, { type WoodworkingProject, type ProjectFile, type ProjectFormData } from './services/projectService'
 import './App.css'
-
-type WoodworkingProject = {
-  id: string
-  title: string
-  date: string
-  materials: string
-  description?: string
-  status?: 'planned' | 'in-progress' | 'completed'
-  files?: { name: string; url: string; type: string; sharePointId?: string }[]
-  createdAt: string
-  updatedAt: string
-}
 
 interface WoodworkingProjectsProps {
   onNavigateBack: () => void
 }
-
-// Configure SharePoint - Now using backend API
-const sharePointConfig = {
-  siteId: import.meta.env.VITE_SHAREPOINT_SITE_ID,
-  folderPath: 'Projects',
-  // Use relative URL in production, localhost in development
-  apiUrl: import.meta.env.DEV ? 'http://localhost:3001/api' : '/api'
-}
-
-const sharePointService = new SharePointService(sharePointConfig)
 
 export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProjectsProps) {
   const [projects, setProjects] = useState<WoodworkingProject[]>([])
@@ -37,11 +15,10 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
   const [isEditing, setIsEditing] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
   // Form state
-  const [formData, setFormData] = useState<Partial<WoodworkingProject>>({
+  const [formData, setFormData] = useState<ProjectFormData>({
     title: '',
     date: new Date().toISOString().split('T')[0],
     materials: '',
@@ -50,7 +27,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
     files: []
   })
 
-  // Load projects from SharePoint
+  // Load projects
   useEffect(() => {
     loadProjects()
   }, [])
@@ -60,102 +37,70 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
       setLoading(true)
       setError(null)
       
-      const data = await sharePointService.loadProjectsData()
-      setProjects(data as WoodworkingProject[])
+      const data = await projectService.getAllProjects()
+      setProjects(data)
       
       if (data.length > 0) {
-        setSelectedProject(data[0] as WoodworkingProject)
+        setSelectedProject(data[0])
       }
     } catch (err) {
       console.error('Error loading projects:', err)
-      setError('Failed to load projects from SharePoint')
-      
-      // Fallback to localStorage
-      const savedProjects = localStorage.getItem('woodworkingProjects')
-      if (savedProjects) {
-        const parsedProjects = JSON.parse(savedProjects)
-        setProjects(parsedProjects)
-        if (parsedProjects.length > 0) {
-          setSelectedProject(parsedProjects[0])
-        }
-      }
+      setError('Failed to load projects from database')
     } finally {
       setLoading(false)
     }
   }
 
-  // Save projects to SharePoint
-  const saveProjects = async (updatedProjects: WoodworkingProject[]) => {
-    try {
-      setSyncing(true)
-      await sharePointService.saveProjectsData(updatedProjects)
-      setProjects(updatedProjects)
-      
-      // Also save to localStorage as backup
-      localStorage.setItem('woodworkingProjects', JSON.stringify(updatedProjects))
-    } catch (err) {
-      console.error('Error saving projects:', err)
-      alert('Failed to sync with SharePoint. Saved locally instead.')
-      
-      // Save to localStorage as fallback
-      localStorage.setItem('woodworkingProjects', JSON.stringify(updatedProjects))
-      setProjects(updatedProjects)
-    } finally {
-      setSyncing(false)
-    }
-  }
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    setFormData((prev: ProjectFormData) => ({ ...prev, [name]: value }))
   }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
-    if (!files || files.length === 0) return
+    if (!files || files.length === 0) {
+      console.log('No files selected')
+      return
+    }
 
+    console.log(`Selected ${files.length} files`)
     setUploading(true)
     try {
-      const uploadPromises = Array.from(files).map(async (file) => {
-        // Generate unique filename
-        const timestamp = Date.now()
-        const fileName = `${timestamp}_${file.name}`
-        
-        const uploadedFile = await sharePointService.uploadFile(file, fileName)
-        return uploadedFile
-      })
-
-      const uploadedFiles = await Promise.all(uploadPromises)
+      const uploadedFiles: any[] = []
       
-      setFormData(prev => ({
-        ...prev,
-        files: [...(prev.files || []), ...uploadedFiles]
-      }))
-
-      alert(`Successfully uploaded ${uploadedFiles.length} file(s) to SharePoint`)
+      for (const file of Array.from(files)) {
+        console.log(`Preparing file: ${file.name} (${file.type}, ${file.size} bytes)`)
+        // We'll upload after saving the project
+        uploadedFiles.push({
+          file,
+          name: file.name,
+          type: file.type
+        })
+      }
+      
+      setFormData((prev: ProjectFormData) => {
+        const newPendingFiles = [...(prev.pendingFiles || []), ...uploadedFiles]
+        console.log(`Total pending files: ${newPendingFiles.length}`)
+        return {
+          ...prev,
+          pendingFiles: newPendingFiles
+        }
+      })
+      
+      // Clear the file input so the same file can be selected again
+      e.target.value = ''
     } catch (err) {
-      console.error('Error uploading files:', err)
-      alert('Failed to upload files to SharePoint')
+      console.error('Error preparing files:', err)
+      alert('Failed to prepare files')
     } finally {
       setUploading(false)
     }
   }
 
-  const removeFile = async (index: number) => {
-    const file = formData.files?.[index]
-    
-    // If file has SharePoint ID, try to delete it from SharePoint
-    if (file?.sharePointId) {
-      try {
-        await sharePointService.deleteFile(file.sharePointId)
-      } catch (err) {
-        console.error('Error deleting file from SharePoint:', err)
-      }
-    }
-    
-    setFormData(prev => ({
+  const removePendingFile = (index: number) => {
+    setFormData((prev: ProjectFormData) => ({
       ...prev,
-      files: prev.files?.filter((_, i) => i !== index)
+      pendingFiles: prev.pendingFiles?.filter((_file: any, i: number) => i !== index)
     }))
   }
 
@@ -167,47 +112,83 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
       return
     }
 
-    const now = new Date().toISOString()
-
-    if (isEditing && selectedProject) {
-      // Update existing project
-      const updatedProjects = projects.map(p => 
-        p.id === selectedProject.id 
-          ? { ...p, ...formData, updatedAt: now } as WoodworkingProject
-          : p
-      )
-      await saveProjects(updatedProjects)
-      setSelectedProject({ ...selectedProject, ...formData, updatedAt: now } as WoodworkingProject)
-    } else {
-      // Create new project
-      const newProject: WoodworkingProject = {
-        id: Date.now().toString(),
-        title: formData.title || '',
-        date: formData.date || new Date().toISOString().split('T')[0],
-        materials: formData.materials || '',
-        description: formData.description,
-        status: formData.status || 'planned',
-        files: formData.files || [],
-        createdAt: now,
-        updatedAt: now
+    setUploading(true)
+    let savedProjectId: string
+    
+    try {
+      if (isEditing && selectedProject) {
+        savedProjectId = selectedProject.id
+        
+        // Update existing project
+        await projectService.updateProject(selectedProject.id, {
+          title: formData.title,
+          date: formData.date,
+          materials: formData.materials,
+          description: formData.description,
+          status: formData.status
+        })
+        
+        // Upload any pending files
+        if (formData.pendingFiles && formData.pendingFiles.length > 0) {
+          console.log(`Uploading ${formData.pendingFiles.length} files...`)
+          for (const pendingFile of formData.pendingFiles) {
+            console.log(`Uploading file: ${pendingFile.name}`)
+            const result = await projectService.uploadFile(selectedProject.id, pendingFile.file)
+            console.log(`File uploaded successfully:`, result)
+          }
+        }
+      } else {
+        // Create new project
+        savedProjectId = Date.now().toString()
+        console.log(`Creating project with ID: ${savedProjectId}`)
+        
+        await projectService.createProject({
+          id: savedProjectId,
+          title: formData.title || '',
+          date: formData.date || new Date().toISOString().split('T')[0],
+          materials: formData.materials || '',
+          description: formData.description,
+          status: formData.status || 'planned'
+        })
+        
+        // Upload files
+        if (formData.pendingFiles && formData.pendingFiles.length > 0) {
+          console.log(`Uploading ${formData.pendingFiles.length} files for new project...`)
+          for (const pendingFile of formData.pendingFiles) {
+            console.log(`Uploading file: ${pendingFile.name}`)
+            const result = await projectService.uploadFile(savedProjectId, pendingFile.file)
+            console.log(`File uploaded successfully:`, result)
+          }
+        }
       }
       
-      const updatedProjects = [newProject, ...projects]
-      await saveProjects(updatedProjects)
-      setSelectedProject(newProject)
+      // Reload projects
+      await loadProjects()
+      
+      // Reload the specific project to show the uploaded files
+      const updatedProject = await projectService.getProject(savedProjectId)
+      setSelectedProject(updatedProject)
+      
+      // Reset form
+      setShowForm(false)
+      setIsEditing(false)
+      setFormData({
+        title: '',
+        date: new Date().toISOString().split('T')[0],
+        materials: '',
+        description: '',
+        status: 'planned',
+        files: [],
+        pendingFiles: []
+      })
+      
+      alert('✅ Project saved successfully!')
+    } catch (err) {
+      console.error('Error saving project:', err)
+      alert(`Failed to save project: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setUploading(false)
     }
-
-    // Reset form
-    setShowForm(false)
-    setIsEditing(false)
-    setFormData({
-      title: '',
-      date: new Date().toISOString().split('T')[0],
-      materials: '',
-      description: '',
-      status: 'planned',
-      files: []
-    })
   }
 
   const handleEdit = (project: WoodworkingProject) => {
@@ -217,7 +198,8 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
       materials: project.materials,
       description: project.description,
       status: project.status,
-      files: project.files
+      files: project.files,
+      pendingFiles: []
     })
     setIsEditing(true)
     setShowForm(true)
@@ -225,26 +207,31 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
 
   const handleDelete = async (projectId: string) => {
     if (window.confirm('Are you sure you want to delete this project?')) {
-      const projectToDelete = projects.find(p => p.id === projectId)
-      
-      // Delete associated files from SharePoint
-      if (projectToDelete?.files) {
-        for (const file of projectToDelete.files) {
-          if (file.sharePointId) {
-            try {
-              await sharePointService.deleteFile(file.sharePointId)
-            } catch (err) {
-              console.error('Error deleting file:', err)
-            }
-          }
+      try {
+        await projectService.deleteProject(projectId)
+        await loadProjects()
+        
+        if (selectedProject?.id === projectId) {
+          setSelectedProject(projects.length > 1 ? projects[0] : null)
         }
+      } catch (err) {
+        console.error('Error deleting project:', err)
+        alert('Failed to delete project')
       }
-      
-      const updatedProjects = projects.filter(p => p.id !== projectId)
-      await saveProjects(updatedProjects)
-      
-      if (selectedProject?.id === projectId) {
-        setSelectedProject(updatedProjects.length > 0 ? updatedProjects[0] : null)
+    }
+  }
+
+  const handleDeleteFile = async (fileId: number) => {
+    if (window.confirm('Are you sure you want to delete this file?')) {
+      try {
+        await projectService.deleteFile(fileId)
+        if (selectedProject) {
+          const updated = await projectService.getProject(selectedProject.id)
+          setSelectedProject(updated)
+        }
+      } catch (err) {
+        console.error('Error deleting file:', err)
+        alert('Failed to delete file')
       }
     }
   }
@@ -256,7 +243,8 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
       materials: '',
       description: '',
       status: 'planned',
-      files: []
+      files: [],
+      pendingFiles: []
     })
     setIsEditing(false)
     setShowForm(true)
@@ -271,26 +259,9 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
       materials: '',
       description: '',
       status: 'planned',
-      files: []
+      files: [],
+      pendingFiles: []
     })
-  }
-
-  const handleExportBackup = () => {
-    const dataStr = JSON.stringify(projects, null, 2)
-    const blob = new Blob([dataStr], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `woodworking-projects-backup-${new Date().toISOString().split('T')[0]}.json`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-  }
-
-  const handleSync = async () => {
-    await loadProjects()
-    alert('Synced with SharePoint!')
   }
 
   const testConnection = async () => {
@@ -300,7 +271,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
       const data = await response.json()
       
       if (data.success) {
-        alert('✅ SharePoint connection successful!')
+        alert('✅ Database connection successful!')
       } else {
         alert('❌ Connection failed: ' + data.error)
       }
@@ -338,7 +309,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
       <div className="shop-tools-container">
         <div className="loading-container">
           <div className="loading-spinner"></div>
-          <p>Loading projects from SharePoint...</p>
+          <p>Loading projects from database...</p>
         </div>
       </div>
     )
@@ -356,17 +327,10 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
         <div className="header-title">
           <Hammer className="w-6 h-6" />
           <h1>Woodworking Projects</h1>
-          {syncing && <Cloud className="w-4 h-4" style={{ animation: 'pulse 2s infinite', marginLeft: '0.5rem' }} />}
         </div>
         
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <button onClick={handleSync} className="back-button" title="Sync with SharePoint" disabled={syncing}>
-            <Cloud className="w-4 h-4" />
-          </button>
-          <button onClick={handleExportBackup} className="back-button" title="Export backup">
-            <Download className="w-4 h-4" />
-          </button>
-          <button onClick={testConnection} className="back-button" title="Test SharePoint Connection" style={{ backgroundColor: '#28a745' }}>
+          <button onClick={testConnection} className="back-button" title="Test Database Connection" style={{ backgroundColor: '#28a745' }}>
             🔧 Test
           </button>
           <div className="tools-count">
@@ -377,7 +341,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
 
       {error && (
         <div style={{ padding: '1rem', backgroundColor: '#fff3cd', borderBottom: '1px solid #ffc107', color: '#856404' }}>
-          ⚠️ {error} - Using local storage as fallback
+          ⚠️ {error}
         </div>
       )}
 
@@ -516,7 +480,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
                 <div className="form-group">
                   <label htmlFor="files">
                     <Upload className="w-4 h-4" style={{ display: 'inline', marginRight: '0.5rem' }} />
-                    Upload Files to SharePoint (Images, PDFs, etc.)
+                    Upload Files to Database (Images, PDFs, etc.)
                   </label>
                   <input
                     type="file"
@@ -527,17 +491,17 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
                     disabled={uploading}
                     style={{ display: 'block', marginTop: '0.5rem' }}
                   />
-                  {uploading && <p style={{ color: '#ffc107', marginTop: '0.5rem' }}>Uploading files to SharePoint...</p>}
+                  {uploading && <p style={{ color: '#ffc107', marginTop: '0.5rem' }}>Preparing files...</p>}
                   
-                  {formData.files && formData.files.length > 0 && (
+                  {formData.pendingFiles && formData.pendingFiles.length > 0 && (
                     <div className="attached-files" style={{ marginTop: '1rem' }}>
-                      {formData.files.map((file, index) => (
+                      {formData.pendingFiles.map((file: any, index: number) => (
                         <div key={index} className="file-item" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#f8f9fa', borderRadius: '4px', marginBottom: '0.5rem' }}>
-                          <Cloud className="w-4 h-4" style={{ color: '#0078d4' }} />
+                          <Paperclip className="w-4 h-4" />
                           <span style={{ flex: 1 }}>{file.name}</span>
                           <button
                             type="button"
-                            onClick={() => removeFile(index)}
+                            onClick={() => removePendingFile(index)}
                             style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer' }}
                           >
                             <X className="w-4 h-4" />
@@ -548,9 +512,9 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
                   )}
                 </div>
 
-                <button type="submit" className="random-button" style={{ marginTop: '1rem' }} disabled={uploading || syncing}>
+                <button type="submit" className="random-button" style={{ marginTop: '1rem' }} disabled={uploading}>
                   <Save className="w-4 h-4" />
-                  {isEditing ? 'Update Project' : 'Save Project'}
+                  {uploading ? 'Saving...' : (isEditing ? 'Update Project' : 'Save Project')}
                 </button>
               </form>
             </div>
@@ -593,7 +557,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
 
                 <div className="detail-item">
                   <span className="detail-label">Created</span>
-                  <span className="detail-value">{new Date(selectedProject.createdAt).toLocaleDateString()}</span>
+                  <span className="detail-value">{new Date(selectedProject.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
 
@@ -617,22 +581,32 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
               {selectedProject.files && selectedProject.files.length > 0 && (
                 <div className="detail-section">
                   <h3 className="section-title">
-                    <Cloud className="w-4 h-4" />
-                    Files on SharePoint ({selectedProject.files.length})
+                    <Paperclip className="w-4 h-4" />
+                    Attached Files ({selectedProject.files.length})
                   </h3>
                   <div className="files-grid">
-                    {selectedProject.files.map((file, index) => (
-                      <div key={index} className="file-preview">
-                        {file.type.startsWith('image/') ? (
-                          <img src={file.url} alt={file.name} style={{ maxWidth: '100%', borderRadius: '8px', marginBottom: '0.5rem' }} />
+                    {selectedProject.files.map((file: ProjectFile) => (
+                      <div key={file.id} className="file-preview">
+                        {file.file_type.startsWith('image/') ? (
+                          <img src={projectService.getFileUrl(file.id!)} alt={file.file_name} style={{ maxWidth: '100%', borderRadius: '8px', marginBottom: '0.5rem' }} />
                         ) : (
                           <div style={{ padding: '2rem', backgroundColor: '#f8f9fa', borderRadius: '8px', textAlign: 'center', marginBottom: '0.5rem' }}>
                             <Paperclip className="w-8 h-8" style={{ margin: '0 auto' }} />
                           </div>
                         )}
-                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="external-link" style={{ fontSize: '0.875rem' }}>
-                          {file.name}
-                        </a>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <a href={projectService.getFileUrl(file.id!)} download={file.file_name} className="external-link" style={{ fontSize: '0.875rem', flex: 1 }}>
+                            <Download className="w-3 h-3" style={{ display: 'inline', marginRight: '0.25rem' }} />
+                            {file.file_name}
+                          </a>
+                          <button
+                            onClick={() => handleDeleteFile(file.id!)}
+                            style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', padding: '0.25rem' }}
+                            title="Delete file"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

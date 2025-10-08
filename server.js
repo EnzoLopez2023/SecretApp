@@ -1,228 +1,189 @@
 import express from 'express'
 import cors from 'cors'
-import fetch from 'node-fetch'
+import mysql from 'mysql2/promise'
 
 const app = express()
 app.use(cors())
 app.use(express.json({ limit: '50mb' }))
-app.use(express.raw({ type: 'application/octet-stream', limit: '50mb' }))
 
-const config = {
-  tenantId: '52188f12-db6b-46c6-88ff-08c802f0ed3b',
-  clientId: '1acaea12-db9e-42ed-8c64-05c7e21dc7d5',
-  clientSecret: 'p6c8Q~MUYN2VlB7m.Zq.BbMkhNZ1kCUWHTg.dblJ',
-  siteId: 'nintekconsulting.sharepoint.com,d94c7375-81db-43af-8370-bd494e630d73,8db02a7f-f7df-42ae-970a-14d7f9c1dc4a'
-}
+// MySQL connection pool
+const pool = mysql.createPool({
+  host: 'localhost',
+  user: 'secretapp',
+  password: 'YourSecurePassword123!',
+  database: 'woodworking_projects',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+})
 
-let cachedToken = null
-let tokenExpiry = 0
-
-async function getAccessToken() {
-  if (cachedToken && Date.now() < tokenExpiry) {
-    return cachedToken
-  }
-
-  const tokenEndpoint = `https://login.microsoftonline.com/${config.tenantId}/oauth2/v2.0/token`
-  const params = new URLSearchParams({
-    client_id: config.clientId,
-    client_secret: config.clientSecret,
-    scope: 'https://graph.microsoft.com/.default',
-    grant_type: 'client_credentials'
-  })
-
-  const response = await fetch(tokenEndpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params
-  })
-
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Token error: ${error}`)
-  }
-
-  const data = await response.json()
-  cachedToken = data.access_token
-  tokenExpiry = Date.now() + (data.expires_in * 1000) - 60000
-  return cachedToken
-}
-
-// Test connection endpoint
+// Test database connection endpoint
 app.get('/api/test', async (req, res) => {
   try {
-    const token = await getAccessToken()
-    res.json({ success: true, message: 'Connected to SharePoint!' })
+    const [rows] = await pool.query('SELECT 1 as test')
+    res.json({ success: true, message: 'Connected to MySQL database!' })
   } catch (error) {
     res.status(500).json({ success: false, error: error.message })
   }
 })
 
-// Get drive ID
-app.get('/api/sharepoint/drive', async (req, res) => {
+// Get all projects with their files
+app.get('/api/projects', async (req, res) => {
   try {
-    const token = await getAccessToken()
-    const response = await fetch(
-      `https://graph.microsoft.com/v1.0/sites/${config.siteId}/drive`,
-      { headers: { 'Authorization': `Bearer ${token}` } }
+    const [projects] = await pool.query(
+      'SELECT * FROM projects ORDER BY created_at DESC'
     )
-    const data = await response.json()
-    res.json(data)
-  } catch (error) {
-    res.status(500).json({ error: error.message })
-  }
-})
-
-// Upload file
-app.put('/api/sharepoint/upload', async (req, res) => {
-  try {
-    const { driveId, folderPath, fileName, fileData } = req.body
-    const token = await getAccessToken()
     
-    // Create folder if it doesn't exist
-    try {
-      await fetch(
-        `https://graph.microsoft.com/v1.0/drives/${driveId}/root/children`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            name: folderPath,
-            folder: {},
-            '@microsoft.graph.conflictBehavior': 'fail'
-          })
-        }
+    // Get files for each project
+    for (const project of projects) {
+      const [files] = await pool.query(
+        'SELECT id, project_id, file_name, file_type, file_size, uploaded_at FROM project_files WHERE project_id = ?',
+        [project.id]
       )
-    } catch (err) {
-      // Folder might already exist, ignore error
+      project.files = files
     }
     
-    // Upload file
-    const buffer = Buffer.from(fileData, 'base64')
-    const uploadUrl = `https://graph.microsoft.com/v1.0/drives/${driveId}/root:/${folderPath}/${fileName}:/content`
-    
-    const response = await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/octet-stream'
-      },
-      body: buffer
-    })
-    
-    const data = await response.json()
-    res.json(data)
-  } catch (error) {
-    console.error('Upload error:', error)
-    res.status(500).json({ error: error.message })
-  }
-})
-
-// Download file
-app.get('/api/sharepoint/download/:fileId', async (req, res) => {
-  try {
-    const token = await getAccessToken()
-    const { fileId } = req.params
-    
-    const response = await fetch(
-      `https://graph.microsoft.com/v1.0/drives/${req.query.driveId}/items/${fileId}/content`,
-      { headers: { 'Authorization': `Bearer ${token}` } }
-    )
-    
-    const buffer = await response.arrayBuffer()
-    res.send(Buffer.from(buffer))
+    res.json(projects)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
 })
 
-// Delete file
-app.delete('/api/sharepoint/file/:fileId', async (req, res) => {
+// Get single project with files
+app.get('/api/projects/:id', async (req, res) => {
   try {
-    const token = await getAccessToken()
-    const { fileId } = req.params
-    const { driveId } = req.query
+    const { id } = req.params
+    const [[project]] = await pool.query('SELECT * FROM projects WHERE id = ?', [id])
     
-    const response = await fetch(
-      `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${fileId}`,
-      {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      }
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' })
+    }
+    
+    const [files] = await pool.query(
+      'SELECT id, project_id, file_name, file_type, file_size, uploaded_at FROM project_files WHERE project_id = ?',
+      [id]
     )
     
+    project.files = files
+    res.json(project)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Create project
+app.post('/api/projects', async (req, res) => {
+  try {
+    const { id, title, date, materials, description, status } = req.body
+    
+    await pool.query(
+      'INSERT INTO projects (id, title, date, materials, description, status) VALUES (?, ?, ?, ?, ?, ?)',
+      [id, title, date, materials, description, status]
+    )
+    
+    res.json({ success: true, id })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Update project
+app.put('/api/projects/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { title, date, materials, description, status } = req.body
+    
+    console.log(`Updating project ${id}:`, { title, date, materials, description, status })
+    
+    const [result] = await pool.query(
+      'UPDATE projects SET title = ?, date = ?, materials = ?, description = ?, status = ? WHERE id = ?',
+      [title, date, materials, description, status, id]
+    )
+    
+    console.log(`Project updated, affected rows: ${result.affectedRows}`)
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: `Project with id ${id} not found` })
+    }
+    
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Update project error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Delete project
+app.delete('/api/projects/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    await pool.query('DELETE FROM projects WHERE id = ?', [id])
     res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
 })
 
-// Load JSON data
-app.get('/api/sharepoint/data/:fileName', async (req, res) => {
+// Upload file
+app.post('/api/projects/:id/files', async (req, res) => {
   try {
-    const token = await getAccessToken()
-    const { fileName } = req.params
-    const { driveId, folderPath } = req.query
+    const { id } = req.params
+    const { fileName, fileData, fileType } = req.body
     
-    const response = await fetch(
-      `https://graph.microsoft.com/v1.0/drives/${driveId}/root:/${folderPath}/${fileName}:/content`,
-      { headers: { 'Authorization': `Bearer ${token}` } }
-    )
-    
-    if (response.status === 404) {
-      return res.json([]) // Return empty array if file doesn't exist
+    if (!fileName || !fileData || !fileType) {
+      return res.status(400).json({ error: 'Missing required fields: fileName, fileData, fileType' })
     }
     
-    const data = await response.json()
-    res.json(data)
+    const buffer = Buffer.from(fileData, 'base64')
+    const fileSize = buffer.length
+    
+    console.log(`Uploading file: ${fileName}, size: ${fileSize} bytes, type: ${fileType}`)
+    
+    const [result] = await pool.query(
+      'INSERT INTO project_files (project_id, file_name, file_data, file_type, file_size) VALUES (?, ?, ?, ?, ?)',
+      [id, fileName, buffer, fileType, fileSize]
+    )
+    
+    res.json({ 
+      success: true, 
+      fileId: result.insertId,
+      fileName,
+      fileType,
+      fileSize
+    })
   } catch (error) {
-    res.json([]) // Return empty array on error
+    console.error('File upload error:', error)
+    res.status(500).json({ error: error.message })
   }
 })
 
-// Save JSON data
-app.put('/api/sharepoint/data/:fileName', async (req, res) => {
+// Download file
+app.get('/api/files/:fileId', async (req, res) => {
   try {
-    const token = await getAccessToken()
-    const { fileName } = req.params
-    const { driveId, folderPath, data } = req.body
+    const { fileId } = req.params
+    const [[file]] = await pool.query(
+      'SELECT file_name, file_data, file_type FROM project_files WHERE id = ?',
+      [fileId]
+    )
     
-    // Create folder if it doesn't exist
-    try {
-      await fetch(
-        `https://graph.microsoft.com/v1.0/drives/${driveId}/root/children`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            name: folderPath,
-            folder: {},
-            '@microsoft.graph.conflictBehavior': 'fail'
-          })
-        }
-      )
-    } catch (err) {
-      // Folder might already exist, ignore error
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' })
     }
     
-    const uploadUrl = `https://graph.microsoft.com/v1.0/drives/${driveId}/root:/${folderPath}/${fileName}:/content`
-    
-    const response = await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    })
-    
-    const result = await response.json()
-    res.json(result)
+    res.setHeader('Content-Type', file.file_type)
+    res.setHeader('Content-Disposition', `attachment; filename="${file.file_name}"`)
+    res.send(file.file_data)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Delete file
+app.delete('/api/files/:fileId', async (req, res) => {
+  try {
+    const { fileId } = req.params
+    await pool.query('DELETE FROM project_files WHERE id = ?', [fileId])
+    res.json({ success: true })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
