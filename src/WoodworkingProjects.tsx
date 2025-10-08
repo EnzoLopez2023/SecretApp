@@ -266,7 +266,12 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
 
   const testConnection = async () => {
     try {
-      const apiUrl = import.meta.env.DEV ? 'http://localhost:3001/api' : '/api'
+      // In production, connect directly to backend on port 3001
+      const productionUrl = window.location.hostname === 'localhost' 
+        ? 'http://localhost:3001/api'
+        : `http://${window.location.hostname}:3001/api`
+      
+      const apiUrl = import.meta.env.DEV ? 'http://localhost:3001/api' : productionUrl
       const response = await fetch(`${apiUrl}/test`)
       const data = await response.json()
       
