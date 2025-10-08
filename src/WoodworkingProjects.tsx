@@ -19,13 +19,11 @@ interface WoodworkingProjectsProps {
   onNavigateBack: () => void
 }
 
-// Configure SharePoint - UPDATE THESE VALUES
+// Configure SharePoint - Now using backend API
 const sharePointConfig = {
-  tenantId: import.meta.env.VITE_SHAREPOINT_TENANT_ID,
-  clientId: import.meta.env.VITE_SHAREPOINT_CLIENT_ID,
-  clientSecret: import.meta.env.VITE_SHAREPOINT_CLIENT_SECRET,
   siteId: import.meta.env.VITE_SHAREPOINT_SITE_ID,
-  folderPath: 'Projects'
+  folderPath: 'Projects',
+  apiUrl: 'http://localhost:3001/api' // Backend server URL
 }
 
 const sharePointService = new SharePointService(sharePointConfig)
@@ -296,68 +294,17 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
 
   const testConnection = async () => {
     try {
-      console.log('🔍 Testing SharePoint Configuration...')
-      console.log('Config:', {
-        tenantId: sharePointConfig.tenantId,
-        clientId: sharePointConfig.clientId,
-        siteId: sharePointConfig.siteId,
-        folderPath: sharePointConfig.folderPath,
-        hasSecret: !!sharePointConfig.clientSecret
-      })
-
-      console.log('📡 Step 1: Getting access token...')
-      const token = await sharePointService['getAccessToken']()
-      console.log('✅ Token obtained successfully')
+      const response = await fetch('http://localhost:3001/api/test')
+      const data = await response.json()
       
-      console.log('📡 Step 2: Getting drive ID...')
-      const driveId = await sharePointService['getDriveId']()
-      console.log('✅ Drive ID:', driveId)
-      
-      console.log('📡 Step 3: Checking if folder exists...')
-      // Try to get the folder
-      const folderCheckUrl = `https://graph.microsoft.com/v1.0/drives/${driveId}/root:/${sharePointConfig.folderPath}`
-      const folderResponse = await fetch(folderCheckUrl, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      
-      if (folderResponse.ok) {
-        const folderData = await folderResponse.json()
-        console.log('✅ Folder exists:', folderData.name)
-        console.log('Folder web URL:', folderData.webUrl)
-        alert(`✅ SharePoint connection successful!\n\nDrive ID: ${driveId}\nFolder: ${folderData.name}\n\nCheck console for details.`)
-      } else if (folderResponse.status === 404) {
-        console.log('⚠️ Folder does not exist. Will be created on first upload.')
-        console.log('📡 Step 4: Listing root folders...')
-        
-        // List what's in the root
-        const rootUrl = `https://graph.microsoft.com/v1.0/drives/${driveId}/root/children`
-        const rootResponse = await fetch(rootUrl, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-        
-        if (rootResponse.ok) {
-          const rootData = await rootResponse.json()
-          console.log('📁 Folders/files in SharePoint root:')
-          rootData.value.forEach((item: any) => {
-            console.log(`  - ${item.name} (${item.folder ? 'folder' : 'file'})`)
-          })
-        }
-        
-        alert(`✅ Connection successful!\n\n⚠️ Folder "${sharePointConfig.folderPath}" doesn't exist yet.\nIt will be created automatically when you upload your first file.\n\nCheck console to see existing folders.`)
+      if (data.success) {
+        alert('✅ SharePoint connection successful!')
       } else {
-        const errorData = await folderResponse.json()
-        console.error('❌ Folder check failed:', errorData)
-        alert(`Connection OK, but folder check failed:\n${errorData.error?.message || 'Unknown error'}`)
+        alert('❌ Connection failed: ' + data.error)
       }
-      
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Connection failed:', error)
-      console.error('Error details:', error.message)
-      alert(`Connection failed!\n\n${error.message || error}\n\nCheck browser console (F12) for details.`)
+      alert('Connection failed: ' + error)
     }
   }
 
