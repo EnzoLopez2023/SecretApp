@@ -32,13 +32,16 @@ class ProjectService {
   private apiUrl: string
 
   constructor() {
-    // In production, connect directly to backend on port 3001
-    // Change 'localhost' to your IIS server IP/hostname if accessing from other machines
-    const productionUrl = window.location.hostname === 'localhost' 
-      ? 'http://localhost:3001/api'
-      : `http://${window.location.hostname}:3001/api`
-    
-    this.apiUrl = import.meta.env.DEV ? 'http://localhost:3001/api' : productionUrl
+    const configuredBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '')
+    if (configuredBase) {
+      this.apiUrl = configuredBase
+      return
+    }
+
+    const devBase = 'http://localhost:3001/api'
+    const prodBase = `${window.location.origin}/api`
+
+    this.apiUrl = import.meta.env.DEV ? devBase : prodBase
   }
 
   async getAllProjects(): Promise<WoodworkingProject[]> {

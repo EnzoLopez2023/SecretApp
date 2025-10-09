@@ -13,6 +13,8 @@
     "start:all": "npm run server & npm run dev"
   },
   "dependencies": {
+    "@azure/msal-browser": "^4.25.0",
+    "@azure/msal-react": "^3.0.20",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "lucide-react": "^0.544.0",
