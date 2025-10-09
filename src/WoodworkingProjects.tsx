@@ -1,13 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist'
+import { getDocument, GlobalWorkerOptions, version as pdfjsVersion } from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker?url'
 import { ArrowLeft, Hammer, Plus, Calendar, FileText, Paperclip, Save, X, Edit2, Trash2, Download, Upload } from 'lucide-react'
 import projectService, { type WoodworkingProject, type ProjectFile, type ProjectFormData } from './services/projectService'
 import './App.css'
 
-const workerSrc = new URL(pdfjsWorker, window.location.origin + import.meta.env.BASE_URL).toString()
-GlobalWorkerOptions.workerSrc = workerSrc
+GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsVersion}/pdf.worker.min.js`
 
 interface WoodworkingProjectsProps {
   onNavigateBack: () => void
