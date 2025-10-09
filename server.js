@@ -171,7 +171,15 @@ app.get('/api/files/:fileId', async (req, res) => {
     }
     
     res.setHeader('Content-Type', file.file_type)
-    res.setHeader('Content-Disposition', `attachment; filename="${file.file_name}"`)
+    
+    // Use 'inline' for PDFs and images so they display in browser
+    // Use 'attachment' for other files to force download
+    if (file.file_type === 'application/pdf' || file.file_type.startsWith('image/')) {
+      res.setHeader('Content-Disposition', `inline; filename="${file.file_name}"`)
+    } else {
+      res.setHeader('Content-Disposition', `attachment; filename="${file.file_name}"`)
+    }
+    
     res.send(file.file_data)
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -185,6 +193,173 @@ app.delete('/api/files/:fileId', async (req, res) => {
     await pool.query('DELETE FROM project_files WHERE id = ?', [fileId])
     res.json({ success: true })
   } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// ============================================
+// MyShop Inventory API Endpoints
+// ============================================
+
+// Get inventory statistics (must be before /:id route)
+app.get('/api/inventory/stats/summary', async (req, res) => {
+  try {
+    const [[stats]] = await pool.query(`
+      SELECT 
+        COUNT(*) as total_items,
+        COUNT(DISTINCT company) as total_companies,
+        SUM(qty) as total_quantity,
+        SUM(price * qty) as total_value,
+        AVG(price) as avg_price
+      FROM myshop_inventory
+    `)
+    res.json(stats)
+  } catch (error) {
+    console.error('Get inventory stats error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Get inventory item by item_id (must be before /:id route)
+app.get('/api/inventory/item/:itemId', async (req, res) => {
+  try {
+    const { itemId } = req.params
+    const [[item]] = await pool.query('SELECT * FROM myshop_inventory WHERE item_id = ?', [itemId])
+    
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' })
+    }
+    
+    res.json(item)
+  } catch (error) {
+    console.error('Get inventory item error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Get all inventory items
+app.get('/api/inventory', async (req, res) => {
+  try {
+    const { search } = req.query
+    
+    let query = 'SELECT * FROM myshop_inventory'
+    let params = []
+    
+    if (search) {
+      query += ' WHERE product_name LIKE ? OR company LIKE ? OR sku LIKE ? OR tags LIKE ?'
+      const searchTerm = `%${search}%`
+      params = [searchTerm, searchTerm, searchTerm, searchTerm]
+    }
+    
+    query += ' ORDER BY item_id ASC'
+    
+    const [items] = await pool.query(query, params)
+    res.json(items)
+  } catch (error) {
+    console.error('Get inventory error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Get single inventory item by database ID
+app.get('/api/inventory/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    const [[item]] = await pool.query('SELECT * FROM myshop_inventory WHERE id = ?', [id])
+    
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' })
+    }
+    
+    res.json(item)
+  } catch (error) {
+    console.error('Get inventory item error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Create new inventory item
+app.post('/api/inventory', async (req, res) => {
+  try {
+    const {
+      item_id, order_number, order_date, product_name, product_detail,
+      company, location, sub_location, tags, sku, price, qty,
+      sku_on_website, barcode, notes, purchased, spare2,
+      base_url, full_url, html_link
+    } = req.body
+    
+    const [result] = await pool.query(
+      `INSERT INTO myshop_inventory (
+        item_id, order_number, order_date, product_name, product_detail,
+        company, location, sub_location, tags, sku, price, qty,
+        sku_on_website, barcode, notes, purchased, spare2,
+        base_url, full_url, html_link
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        item_id, order_number, order_date, product_name, product_detail,
+        company, location, sub_location, tags, sku, price || 0, qty || 0,
+        sku_on_website, barcode, notes, purchased, spare2,
+        base_url, full_url, html_link
+      ]
+    )
+    
+    res.json({ success: true, id: result.insertId })
+  } catch (error) {
+    console.error('Create inventory item error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Update inventory item
+app.put('/api/inventory/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    const {
+      item_id, order_number, order_date, product_name, product_detail,
+      company, location, sub_location, tags, sku, price, qty,
+      sku_on_website, barcode, notes, purchased, spare2,
+      base_url, full_url, html_link
+    } = req.body
+    
+    const [result] = await pool.query(
+      `UPDATE myshop_inventory SET
+        item_id = ?, order_number = ?, order_date = ?, product_name = ?, product_detail = ?,
+        company = ?, location = ?, sub_location = ?, tags = ?, sku = ?, price = ?, qty = ?,
+        sku_on_website = ?, barcode = ?, notes = ?, purchased = ?, spare2 = ?,
+        base_url = ?, full_url = ?, html_link = ?
+      WHERE id = ?`,
+      [
+        item_id, order_number, order_date, product_name, product_detail,
+        company, location, sub_location, tags, sku, price || 0, qty || 0,
+        sku_on_website, barcode, notes, purchased, spare2,
+        base_url, full_url, html_link, id
+      ]
+    )
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Item not found' })
+    }
+    
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Update inventory item error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Delete inventory item
+app.delete('/api/inventory/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    const [result] = await pool.query('DELETE FROM myshop_inventory WHERE id = ?', [id])
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Item not found' })
+    }
+    
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Delete inventory item error:', error)
     res.status(500).json({ error: error.message })
   }
 })

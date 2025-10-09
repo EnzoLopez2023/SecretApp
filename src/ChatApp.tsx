@@ -310,18 +310,18 @@ export default function ChatApp({ onNavigateToConverter, onNavigateToShop, onNav
         <h1>AI Chat Assistant</h1>
         <div className="nav-buttons">
           <button
-            onClick={onNavigateToConverter}
-            className="nav-button"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Excel to JSON Converter
-          </button>
-          <button
             onClick={onNavigateToShop}
             className="nav-button"
           >
             <Package className="w-4 h-4" />
             My Shop Tools
+          </button>
+          <button
+            onClick={onNavigateToWoodworking}
+            className="nav-button"
+          >
+            <Hammer className="w-4 h-4" />
+            Woodworking Projects
           </button>
           <button
             onClick={onNavigateToHalloween}
@@ -331,11 +331,11 @@ export default function ChatApp({ onNavigateToConverter, onNavigateToShop, onNav
             Halloween Movies
           </button>
           <button
-            onClick={onNavigateToWoodworking}
+            onClick={onNavigateToConverter}
             className="nav-button"
           >
-            <Hammer className="w-4 h-4" />
-            Woodworking Projects
+            <FileSpreadsheet className="w-4 h-4" />
+            Excel to JSON Converter
           </button>
         </div>
       </div>

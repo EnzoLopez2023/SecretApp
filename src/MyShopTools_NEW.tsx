@@ -346,7 +346,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
                   
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div>
-                      <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500', color: '#1f2937' }}>
+                      <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>
                         Product Name *
                       </label>
                       <input
@@ -365,7 +365,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                       <div>
-                        <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500', color: '#1f2937' }}>
+                        <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>
                           Company
                         </label>
                         <input
@@ -382,7 +382,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
                       </div>
 
                       <div>
-                        <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500', color: '#1f2937' }}>
+                        <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>
                           SKU
                         </label>
                         <input
@@ -401,7 +401,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                       <div>
-                        <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500', color: '#1f2937' }}>
+                        <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>
                           Price
                         </label>
                         <input
@@ -419,7 +419,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
                       </div>
 
                       <div>
-                        <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500', color: '#1f2937' }}>
+                        <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>
                           Quantity
                         </label>
                         <input
@@ -438,7 +438,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                       <div>
-                        <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500', color: '#1f2937' }}>
+                        <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>
                           Location
                         </label>
                         <input
@@ -455,7 +455,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
                       </div>
 
                       <div>
-                        <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500', color: '#1f2937' }}>
+                        <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>
                           Sub Location
                         </label>
                         <input
@@ -473,7 +473,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500', color: '#1f2937' }}>
+                      <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>
                         Tags
                       </label>
                       <input
@@ -491,7 +491,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500', color: '#1f2937' }}>
+                      <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>
                         Purchased From
                       </label>
                       <input
@@ -508,7 +508,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500', color: '#1f2937' }}>
+                      <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>
                         Barcode
                       </label>
                       <input
@@ -525,7 +525,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500', color: '#1f2937' }}>
+                      <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>
                         Website Link
                       </label>
                       <input
@@ -543,7 +543,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
                     </div>
 
                     <div>
-                      <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500', color: '#1f2937' }}>
+                      <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>
                         Notes
                       </label>
                       <textarea

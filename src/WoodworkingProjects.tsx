@@ -1,7 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist'
+import type { PDFDocumentProxy } from 'pdfjs-dist'
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker?url'
 import { ArrowLeft, Hammer, Plus, Calendar, FileText, Paperclip, Save, X, Edit2, Trash2, Download, Upload } from 'lucide-react'
 import projectService, { type WoodworkingProject, type ProjectFile, type ProjectFormData } from './services/projectService'
 import './App.css'
+
+GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 interface WoodworkingProjectsProps {
   onNavigateBack: () => void
@@ -16,7 +21,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
   const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
+
   // Form state
   const [formData, setFormData] = useState<ProjectFormData>({
     title: '',
@@ -36,10 +41,10 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
     try {
       setLoading(true)
       setError(null)
-      
+
       const data = await projectService.getAllProjects()
       setProjects(data)
-      
+
       if (data.length > 0) {
         setSelectedProject(data[0])
       }
@@ -67,7 +72,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
     setUploading(true)
     try {
       const uploadedFiles: any[] = []
-      
+
       for (const file of Array.from(files)) {
         console.log(`Preparing file: ${file.name} (${file.type}, ${file.size} bytes)`)
         // We'll upload after saving the project
@@ -77,7 +82,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
           type: file.type
         })
       }
-      
+
       setFormData((prev: ProjectFormData) => {
         const newPendingFiles = [...(prev.pendingFiles || []), ...uploadedFiles]
         console.log(`Total pending files: ${newPendingFiles.length}`)
@@ -86,7 +91,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
           pendingFiles: newPendingFiles
         }
       })
-      
+
       // Clear the file input so the same file can be selected again
       e.target.value = ''
     } catch (err) {
@@ -106,7 +111,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.title?.trim()) {
       alert('Please enter a project title')
       return
@@ -114,11 +119,11 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
 
     setUploading(true)
     let savedProjectId: string
-    
+
     try {
       if (isEditing && selectedProject) {
         savedProjectId = selectedProject.id
-        
+
         // Update existing project
         await projectService.updateProject(selectedProject.id, {
           title: formData.title,
@@ -127,7 +132,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
           description: formData.description,
           status: formData.status
         })
-        
+
         // Upload any pending files
         if (formData.pendingFiles && formData.pendingFiles.length > 0) {
           console.log(`Uploading ${formData.pendingFiles.length} files...`)
@@ -141,7 +146,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
         // Create new project
         savedProjectId = Date.now().toString()
         console.log(`Creating project with ID: ${savedProjectId}`)
-        
+
         await projectService.createProject({
           id: savedProjectId,
           title: formData.title || '',
@@ -150,7 +155,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
           description: formData.description,
           status: formData.status || 'planned'
         })
-        
+
         // Upload files
         if (formData.pendingFiles && formData.pendingFiles.length > 0) {
           console.log(`Uploading ${formData.pendingFiles.length} files for new project...`)
@@ -161,14 +166,14 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
           }
         }
       }
-      
+
       // Reload projects
       await loadProjects()
-      
+
       // Reload the specific project to show the uploaded files
       const updatedProject = await projectService.getProject(savedProjectId)
       setSelectedProject(updatedProject)
-      
+
       // Reset form
       setShowForm(false)
       setIsEditing(false)
@@ -181,7 +186,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
         files: [],
         pendingFiles: []
       })
-      
+
       alert('✅ Project saved successfully!')
     } catch (err) {
       console.error('Error saving project:', err)
@@ -210,7 +215,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
       try {
         await projectService.deleteProject(projectId)
         await loadProjects()
-        
+
         if (selectedProject?.id === projectId) {
           setSelectedProject(projects.length > 1 ? projects[0] : null)
         }
@@ -267,14 +272,13 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
   const testConnection = async () => {
     try {
       // In production, connect directly to backend on port 3001
-      const productionUrl = window.location.hostname === 'localhost' 
-        ? 'http://localhost:3001/api'
-        : `http://${window.location.hostname}:3001/api`
-      
+      const productionUrl =
+        window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : `http://${window.location.hostname}:3001/api`
+
       const apiUrl = import.meta.env.DEV ? 'http://localhost:3001/api' : productionUrl
       const response = await fetch(`${apiUrl}/test`)
       const data = await response.json()
-      
+
       if (data.success) {
         alert('✅ Database connection successful!')
       } else {
@@ -286,18 +290,23 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
     }
   }
 
-  const filteredProjects = projects.filter(project =>
-    project.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    project.materials?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    project.description?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredProjects = projects.filter(
+    (project) =>
+      project.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      project.materials?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      project.description?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const getStatusColor = (status?: string) => {
     switch (status) {
-      case 'planned': return '#6c757d'
-      case 'in-progress': return '#ffc107'
-      case 'completed': return '#28a745'
-      default: return '#6c757d'
+      case 'planned':
+        return '#6c757d'
+      case 'in-progress':
+        return '#ffc107'
+      case 'completed':
+        return '#28a745'
+      default:
+        return '#6c757d'
     }
   }
 
@@ -328,12 +337,12 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
           <ArrowLeft className="w-4 h-4" />
           Back to Chat
         </button>
-        
+
         <div className="header-title">
           <Hammer className="w-6 h-6" />
           <h1>Woodworking Projects</h1>
         </div>
-        
+
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <button onClick={testConnection} className="back-button" title="Test Database Connection" style={{ backgroundColor: '#28a745' }}>
             🔧 Test
@@ -383,15 +392,18 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
                 <div className="tool-name">{project.title}</div>
                 <div className="tool-meta">
                   <span className="tool-company">{formatDate(project.date)}</span>
-                  <span 
-                    className="tool-price" 
+                  <span
+                    className="tool-price"
                     style={{ backgroundColor: getStatusColor(project.status), color: 'white', padding: '2px 8px', borderRadius: '12px' }}
                   >
                     {project.status}
                   </span>
                 </div>
                 {project.materials && (
-                  <div className="tool-sku">{project.materials.substring(0, 50)}{project.materials.length > 50 ? '...' : ''}</div>
+                  <div className="tool-sku">
+                    {project.materials.substring(0, 50)}
+                    {project.materials.length > 50 ? '...' : ''}
+                  </div>
                 )}
               </div>
             ))}
@@ -418,38 +430,17 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
               <form onSubmit={handleSubmit} className="project-form">
                 <div className="form-group">
                   <label htmlFor="title">Project Title *</label>
-                  <input
-                    type="text"
-                    id="title"
-                    name="title"
-                    value={formData.title}
-                    onChange={handleInputChange}
-                    className="search-input"
-                    required
-                  />
+                  <input type="text" id="title" name="title" value={formData.title} onChange={handleInputChange} className="search-input" required />
                 </div>
 
                 <div className="form-group">
                   <label htmlFor="date">Date</label>
-                  <input
-                    type="date"
-                    id="date"
-                    name="date"
-                    value={formData.date}
-                    onChange={handleInputChange}
-                    className="search-input"
-                  />
+                  <input type="date" id="date" name="date" value={formData.date} onChange={handleInputChange} className="search-input" />
                 </div>
 
                 <div className="form-group">
                   <label htmlFor="status">Status</label>
-                  <select
-                    id="status"
-                    name="status"
-                    value={formData.status}
-                    onChange={handleInputChange}
-                    className="search-input"
-                  >
+                  <select id="status" name="status" value={formData.status} onChange={handleInputChange} className="search-input">
                     <option value="planned">Planned</option>
                     <option value="in-progress">In Progress</option>
                     <option value="completed">Completed</option>
@@ -497,18 +488,18 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
                     style={{ display: 'block', marginTop: '0.5rem' }}
                   />
                   {uploading && <p style={{ color: '#ffc107', marginTop: '0.5rem' }}>Preparing files...</p>}
-                  
+
                   {formData.pendingFiles && formData.pendingFiles.length > 0 && (
                     <div className="attached-files" style={{ marginTop: '1rem' }}>
                       {formData.pendingFiles.map((file: any, index: number) => (
-                        <div key={index} className="file-item" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#f8f9fa', borderRadius: '4px', marginBottom: '0.5rem' }}>
+                        <div
+                          key={index}
+                          className="file-item"
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#f8f9fa', borderRadius: '4px', marginBottom: '0.5rem' }}
+                        >
                           <Paperclip className="w-4 h-4" />
                           <span style={{ flex: 1 }}>{file.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => removePendingFile(index)}
-                            style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer' }}
-                          >
+                          <button type="button" onClick={() => removePendingFile(index)} style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer' }}>
                             <X className="w-4 h-4" />
                           </button>
                         </div>
@@ -519,7 +510,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
 
                 <button type="submit" className="random-button" style={{ marginTop: '1rem' }} disabled={uploading}>
                   <Save className="w-4 h-4" />
-                  {uploading ? 'Saving...' : (isEditing ? 'Update Project' : 'Save Project')}
+                  {uploading ? 'Saving...' : isEditing ? 'Update Project' : 'Save Project'}
                 </button>
               </form>
             </div>
@@ -528,10 +519,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
               <div className="details-header">
                 <div>
                   <h2 className="details-title">{selectedProject.title}</h2>
-                  <span 
-                    className="tag" 
-                    style={{ backgroundColor: getStatusColor(selectedProject.status), color: 'white', marginTop: '0.5rem', display: 'inline-block' }}
-                  >
+                  <span className="tag" style={{ backgroundColor: getStatusColor(selectedProject.status), color: 'white', marginTop: '0.5rem', display: 'inline-block' }}>
                     {selectedProject.status}
                   </span>
                 </div>
@@ -540,11 +528,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
                     <Edit2 className="w-4 h-4" />
                     Edit
                   </button>
-                  <button 
-                    onClick={() => handleDelete(selectedProject.id)} 
-                    className="back-button" 
-                    style={{ backgroundColor: '#dc3545' }}
-                  >
+                  <button onClick={() => handleDelete(selectedProject.id)} className="back-button" style={{ backgroundColor: '#dc3545' }}>
                     <Trash2 className="w-4 h-4" />
                     Delete
                   </button>
@@ -572,14 +556,18 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
                     <FileText className="w-4 h-4" />
                     Materials
                   </h3>
-                  <p className="section-content" style={{ whiteSpace: 'pre-wrap' }}>{selectedProject.materials}</p>
+                  <p className="section-content" style={{ whiteSpace: 'pre-wrap' }}>
+                    {selectedProject.materials}
+                  </p>
                 </div>
               )}
 
               {selectedProject.description && (
                 <div className="detail-section">
                   <h3 className="section-title">Description</h3>
-                  <p className="section-content" style={{ whiteSpace: 'pre-wrap' }}>{selectedProject.description}</p>
+                  <p className="section-content" style={{ whiteSpace: 'pre-wrap' }}>
+                    {selectedProject.description}
+                  </p>
                 </div>
               )}
 
@@ -594,15 +582,62 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
                       <div key={file.id} className="file-preview">
                         {file.file_type.startsWith('image/') ? (
                           <img src={projectService.getFileUrl(file.id!)} alt={file.file_name} style={{ maxWidth: '100%', borderRadius: '8px', marginBottom: '0.5rem' }} />
+                        ) : file.file_type === 'application/pdf' ? (
+                          file.id ? (
+                            <PdfAttachmentViewer file={file} />
+                          ) : (
+                            <div style={{ padding: '2rem', backgroundColor: '#f8f9fa', borderRadius: '8px', textAlign: 'center', marginBottom: '0.5rem' }}>
+                              <p style={{ marginBottom: '0.5rem' }}>Unable to preview this PDF (missing identifier).</p>
+                              <a
+                                href={projectService.getFileUrl(file.id ?? 0)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  display: 'inline-block',
+                                  marginTop: '0.5rem',
+                                  padding: '0.5rem 1rem',
+                                  backgroundColor: '#0d6efd',
+                                  color: 'white',
+                                  borderRadius: '0.375rem',
+                                  textDecoration: 'none'
+                                }}
+                              >
+                                Open PDF in New Tab
+                              </a>
+                            </div>
+                          )
                         ) : (
                           <div style={{ padding: '2rem', backgroundColor: '#f8f9fa', borderRadius: '8px', textAlign: 'center', marginBottom: '0.5rem' }}>
                             <Paperclip className="w-8 h-8" style={{ margin: '0 auto' }} />
                           </div>
                         )}
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                          <a href={projectService.getFileUrl(file.id!)} download={file.file_name} className="external-link" style={{ fontSize: '0.875rem', flex: 1 }}>
-                            <Download className="w-3 h-3" style={{ display: 'inline', marginRight: '0.25rem' }} />
+                          <a
+                            href={projectService.getFileUrl(file.id!)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="external-link"
+                            style={{ fontSize: '0.875rem', flex: 1 }}
+                          >
+                            <FileText className="w-3 h-3" style={{ display: 'inline', marginRight: '0.25rem' }} />
                             {file.file_name}
+                          </a>
+                          <a
+                            href={projectService.getFileUrl(file.id!)}
+                            download={file.file_name}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#0d6efd',
+                              cursor: 'pointer',
+                              padding: '0.25rem',
+                              textDecoration: 'none',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                            title="Download file"
+                          >
+                            <Download className="w-4 h-4" />
                           </a>
                           <button
                             onClick={() => handleDeleteFile(file.id!)}
@@ -626,6 +661,131 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+interface PdfAttachmentViewerProps {
+  file: ProjectFile
+}
+
+function PdfAttachmentViewer({ file }: PdfAttachmentViewerProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    let pdfDoc: PDFDocumentProxy | null = null
+    const controller = new AbortController()
+
+    const renderPdf = async () => {
+      if (!file.id) {
+        setError('Missing file identifier')
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
+      setError(null)
+
+      const container = containerRef.current
+      if (!container) {
+        setLoading(false)
+        return
+      }
+
+      container.innerHTML = ''
+
+      try {
+        const response = await fetch(`${projectService.getFileUrl(file.id)}?inline=1`, {
+          headers: { Accept: 'application/pdf' },
+          signal: controller.signal
+        })
+        if (!response.ok) {
+          throw new Error(`Failed to fetch PDF (status ${response.status})`)
+        }
+
+        const arrayBuffer = await response.arrayBuffer()
+        if (cancelled) {
+          return
+        }
+
+        pdfDoc = await getDocument({ data: arrayBuffer }).promise
+        if (cancelled) {
+          return
+        }
+
+        for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+          const page = await pdfDoc.getPage(pageNum)
+          if (cancelled) {
+            return
+          }
+
+    const viewport = page.getViewport({ scale: 2.4 })
+          const canvas = document.createElement('canvas')
+          const context = canvas.getContext('2d')
+          if (!context) {
+            continue
+          }
+
+          canvas.width = viewport.width
+          canvas.height = viewport.height
+          canvas.style.width = '100%'
+          canvas.style.height = 'auto'
+          canvas.style.display = 'block'
+          canvas.style.margin = '0 auto 1rem'
+
+          container.appendChild(canvas)
+
+          await page.render({ canvasContext: context, viewport, canvas }).promise
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('PDF render error:', err)
+          setError(err instanceof Error ? err.message : String(err))
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    renderPdf()
+
+    return () => {
+      cancelled = true
+      controller.abort()
+      if (pdfDoc) {
+        pdfDoc.destroy()
+      }
+    }
+  }, [file.id])
+
+  return (
+    <div
+      style={{
+  width: '100%',
+  maxHeight: '1200px',
+        overflowY: 'auto',
+        border: '1px solid #dee2e6',
+        borderRadius: '8px',
+        padding: '1rem',
+        backgroundColor: '#ffffff',
+        marginBottom: '0.5rem'
+      }}
+    >
+      {loading && <p style={{ color: '#6c757d', margin: 0 }}>Rendering PDF...</p>}
+      {error && (
+        <p style={{ color: '#dc3545', margin: 0 }}>
+          Unable to render PDF: {error}.{' '}
+          <a href={projectService.getFileUrl(file.id!)} target="_blank" rel="noopener noreferrer">
+            Open in new tab
+          </a>
+        </p>
+      )}
+      <div ref={containerRef} />
     </div>
   )
 }
