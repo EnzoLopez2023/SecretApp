@@ -6,7 +6,8 @@ import { ArrowLeft, Hammer, Plus, Calendar, FileText, Paperclip, Save, X, Edit2,
 import projectService, { type WoodworkingProject, type ProjectFile, type ProjectFormData } from './services/projectService'
 import './App.css'
 
-GlobalWorkerOptions.workerSrc = pdfjsWorker
+const workerSrc = new URL(pdfjsWorker, window.location.origin + import.meta.env.BASE_URL).toString()
+GlobalWorkerOptions.workerSrc = workerSrc
 
 interface WoodworkingProjectsProps {
   onNavigateBack: () => void
