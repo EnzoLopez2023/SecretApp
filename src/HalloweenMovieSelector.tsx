@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Shuffle, ArrowLeft, Film } from 'lucide-react'
 import './App.css'
 
@@ -81,17 +81,23 @@ export default function HalloweenMovieSelector({ onNavigateBack }: HalloweenMovi
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
 
-  const PLEX_URL = 'http://plex.enzolopez.net:32400/library/sections/9/all?X-Plex-Token=5kj8hCXerpUCNp5AxH5V'
-
-  useEffect(() => {
-    fetchMovies()
+  const apiBaseUrl = useMemo(() => {
+    const configuredBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '')
+    if (configuredBase) {
+      return configuredBase
+    }
+    const devBase = 'http://localhost:3001/api'
+    const prodBase = `${window.location.origin}/api`
+    return import.meta.env.DEV ? devBase : prodBase
   }, [])
 
-  const fetchMovies = async () => {
+  const plexLibraryEndpoint = `${apiBaseUrl}/plex/library`
+
+  const fetchMovies = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetch(PLEX_URL, {
+      const response = await fetch(plexLibraryEndpoint, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -115,7 +121,11 @@ export default function HalloweenMovieSelector({ onNavigateBack }: HalloweenMovi
     } finally {
       setLoading(false)
     }
-  }
+  }, [plexLibraryEndpoint])
+
+  useEffect(() => {
+    fetchMovies()
+  }, [fetchMovies])
 
   const pickRandomMovie = () => {
     if (filteredMovies.length > 0) {
@@ -130,9 +140,10 @@ export default function HalloweenMovieSelector({ onNavigateBack }: HalloweenMovi
     return `${hours}h ${minutes}m`
   }
 
-  const getImageUrl = (path: string) => {
-    if (path.startsWith('http')) return path
-    return `http://plex.enzolopez.net:32400${path}?X-Plex-Token=5kj8hCXerpUCNp5AxH5V`
+  const getImageUrl = (path?: string) => {
+    if (!path) return ''
+    const encodedPath = encodeURIComponent(path)
+    return `${apiBaseUrl}/plex/image?path=${encodedPath}`
   }
 
   const filteredMovies = movies.filter(movie =>

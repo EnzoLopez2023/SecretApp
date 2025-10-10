@@ -1,10 +1,21 @@
 import express from 'express'
 import cors from 'cors'
 import mysql from 'mysql2/promise'
+import fetch from 'node-fetch'
+import https from 'https'
 
 const app = express()
 app.use(cors())
 app.use(express.json({ limit: '50mb' }))
+
+// Plex configuration (proxied to avoid CORS and certificate issues)
+const plexConfig = {
+  baseUrl: process.env.PLEX_BASE_URL || 'https://plex.enzolopez.net:32400',
+  token: process.env.PLEX_TOKEN || '5kj8hCXerpUCNp5AxH5V',
+  librarySection: process.env.PLEX_LIBRARY_SECTION || '9'
+}
+
+const plexAgent = new https.Agent({ rejectUnauthorized: false })
 
 // MySQL connection pool
 const pool = mysql.createPool({
@@ -15,6 +26,79 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
+})
+
+// ============================================
+// Plex Proxy Endpoints
+// ============================================
+
+app.get('/api/plex/library', async (req, res) => {
+  try {
+    const url = `${plexConfig.baseUrl}/library/sections/${plexConfig.librarySection}/all?X-Plex-Token=${plexConfig.token}`
+
+    const plexResponse = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json'
+      },
+      agent: plexAgent
+    })
+
+    if (!plexResponse.ok) {
+      throw new Error(`Plex library request failed with status ${plexResponse.status}`)
+    }
+
+    const data = await plexResponse.json()
+    res.json(data)
+  } catch (error) {
+    console.error('Plex library fetch error:', error)
+    res.status(500).json({ error: 'Failed to fetch Plex library' })
+  }
+})
+
+app.get('/api/plex/image', async (req, res) => {
+  try {
+    const { path } = req.query
+
+    if (!path || typeof path !== 'string') {
+      return res.status(400).json({ error: 'Image path is required' })
+    }
+
+    const decodedPath = decodeURIComponent(path)
+    let targetUrl = decodedPath
+
+    if (!/^https?:\/\//i.test(decodedPath)) {
+      const separator = decodedPath.includes('?') ? '&' : '?'
+      const tokenParam = decodedPath.includes('X-Plex-Token') ? '' : `${separator}X-Plex-Token=${plexConfig.token}`
+      targetUrl = `${plexConfig.baseUrl}${decodedPath}${tokenParam}`
+    }
+
+    const urlObject = new URL(targetUrl)
+    if (!urlObject.hostname.endsWith('enzolopez.net')) {
+      return res.status(400).json({ error: 'Invalid image host' })
+    }
+
+    const plexResponse = await fetch(targetUrl, { agent: plexAgent })
+
+    if (!plexResponse.ok) {
+      throw new Error(`Plex image request failed with status ${plexResponse.status}`)
+    }
+
+    // Forward useful headers
+    const contentType = plexResponse.headers.get('content-type')
+    const contentLength = plexResponse.headers.get('content-length')
+    const cacheControl = plexResponse.headers.get('cache-control')
+
+    if (contentType) res.setHeader('Content-Type', contentType)
+    if (contentLength) res.setHeader('Content-Length', contentLength)
+    if (cacheControl) res.setHeader('Cache-Control', cacheControl)
+
+    const buffer = await plexResponse.buffer()
+    res.send(buffer)
+  } catch (error) {
+    console.error('Plex image proxy error:', error)
+    res.status(500).json({ error: 'Failed to fetch Plex image' })
+  }
 })
 
 // Test database connection endpoint

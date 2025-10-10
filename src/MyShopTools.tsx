@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { ArrowLeft, Package, MapPin, DollarSign, Hash, Calendar, ExternalLink, Building, Tag, Plus, Edit2, Trash2, Save, X } from 'lucide-react'
 
 // Define the Tool type based on the expected structure from MySQL database
@@ -40,33 +40,45 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [editForm, setEditForm] = useState<Partial<Tool>>({})
 
-  useEffect(() => {
-    fetchTools()
+  const apiBaseUrl = useMemo(() => {
+    const configuredBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '')
+    if (configuredBase) {
+      return configuredBase
+    }
+    const devBase = 'http://localhost:3001/api'
+    const prodBase = `${window.location.origin}/api`
+    return import.meta.env.DEV ? devBase : prodBase
   }, [])
 
-  const fetchTools = async () => {
+  const fetchTools = useCallback(async (): Promise<Tool[]> => {
     try {
       setLoading(true)
-      const response = await fetch('http://localhost:3001/api/inventory')
+      const response = await fetch(`${apiBaseUrl}/inventory`)
       
       if (!response.ok) {
         throw new Error(`Failed to fetch inventory: ${response.statusText}`)
       }
       
-      const data = await response.json()
+      const data: Tool[] = await response.json()
       setTools(data)
       
-      if (data.length > 0 && !selectedTool) {
-        setSelectedTool(data[0])
+      if (data.length > 0) {
+        setSelectedTool((prev) => prev ?? data[0])
       }
       setError(null)
+      return data
     } catch (err) {
       console.error('Error fetching inventory:', err)
       setError(err instanceof Error ? err.message : 'Failed to load inventory')
+      return []
     } finally {
       setLoading(false)
     }
-  }
+  }, [apiBaseUrl])
+
+  useEffect(() => {
+    fetchTools()
+  }, [fetchTools])
 
   const handleAdd = () => {
     // Get the next available item_id
@@ -107,7 +119,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
     try {
       if (isAdding) {
         // Create new item
-        const response = await fetch('http://localhost:3001/api/inventory', {
+        const response = await fetch(`${apiBaseUrl}/inventory`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(editForm)
@@ -118,10 +130,8 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
         }
 
         const result = await response.json()
-        await fetchTools() // Refresh the list
-        
-        // Select the newly created item
-        const newTool = tools.find(t => t.id === result.id)
+        const refreshedTools = await fetchTools()
+        const newTool = refreshedTools.find((t) => t.id === result.id)
         if (newTool) {
           setSelectedTool(newTool)
         }
@@ -129,7 +139,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
         // Update existing item
         if (!selectedTool?.id) return
 
-        const response = await fetch(`http://localhost:3001/api/inventory/${selectedTool.id}`, {
+        const response = await fetch(`${apiBaseUrl}/inventory/${selectedTool.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(editForm)
@@ -139,10 +149,8 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
           throw new Error('Failed to update item')
         }
 
-        await fetchTools() // Refresh the list
-        
-        // Update selected tool with new data
-        const updatedTool = tools.find(t => t.id === selectedTool.id)
+        const refreshedTools = await fetchTools()
+        const updatedTool = refreshedTools.find((t) => t.id === selectedTool.id)
         if (updatedTool) {
           setSelectedTool(updatedTool)
         }
@@ -165,7 +173,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/api/inventory/${selectedTool.id}`, {
+      const response = await fetch(`${apiBaseUrl}/inventory/${selectedTool.id}`, {
         method: 'DELETE'
       })
 
@@ -173,12 +181,9 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
         throw new Error('Failed to delete item')
       }
 
-      await fetchTools() // Refresh the list
-      
-      // Select first item if available
-      if (tools.length > 1) {
-        const remainingTools = tools.filter(t => t.id !== selectedTool.id)
-        setSelectedTool(remainingTools[0])
+      const refreshedTools = await fetchTools()
+      if (refreshedTools.length > 0) {
+        setSelectedTool(refreshedTools[0])
       } else {
         setSelectedTool(null)
       }
