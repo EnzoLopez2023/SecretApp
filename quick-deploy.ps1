@@ -23,6 +23,14 @@ Remove-Item "C:\inetpub\wwwroot\secretapp\*" -Recurse -Force -ErrorAction Silent
 Write-Host "Copying new build..." -ForegroundColor Yellow
 Copy-Item -Path "dist\*" -Destination "C:\inetpub\wwwroot\secretapp\" -Recurse -Force
 
+# Copy server files if they don't exist
+if (-not (Test-Path "C:\inetpub\wwwroot\secretapp\package.json")) {
+    Write-Host "Copying server files (package.json, server.js, ecosystem.config.cjs)..." -ForegroundColor Yellow
+    Copy-Item -Path "package.json" -Destination "C:\inetpub\wwwroot\secretapp\" -Force
+    Copy-Item -Path "server.js" -Destination "C:\inetpub\wwwroot\secretapp\" -Force
+    Copy-Item -Path "ecosystem.config.cjs" -Destination "C:\inetpub\wwwroot\secretapp\" -Force
+}
+
 # Install backend dependencies if needed
 Write-Host "Checking backend dependencies..." -ForegroundColor Yellow
 $npmInstalled = Test-Path "C:\inetpub\wwwroot\secretapp\node_modules"

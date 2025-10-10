@@ -982,26 +982,59 @@
   }
 
   .shop-content {
+    /* Use flex to fill available space instead of fixed height */
+    flex: 1;
+    display: flex !important; /* Change to flex so children can size properly */
     flex-direction: column;
-    height: calc(100vh - 140px);
+    min-height: 0; /* Allow flex shrink */
+    position: relative;
+    overflow: hidden;
   }
 
   .tools-list-panel {
     width: 100%;
-    height: 50%;
+    flex: 1; /* Take all available space */
     border-right: none;
-    border-bottom: 2px solid #ddd;
-    overflow-y: auto;
+    border-bottom: none;
+    overflow-y: auto; /* Enable scrolling */
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    display: flex;
+    flex-direction: column;
+    background: white; /* Ensure white background fills */
+    position: relative; /* Ensure proper stacking */
+    z-index: 1;
   }
 
   .tool-details-panel {
+    display: none; /* Hidden by default on mobile */
     width: 100%;
-    height: 50%;
+    height: 100%;
     overflow-y: auto;
+    position: absolute;
+    top: 0;
+    left: 0;
+    background: white;
+    z-index: 10;
+  }
+
+  /* Show details panel when show-mobile class is added */
+  .tool-details-panel.show-mobile {
+    display: block; /* Changed from flex to block */
+    height: 100%; /* Ensure full height */
   }
 
   .tool-details {
     padding: 1rem;
+    min-height: 100%; /* Fill available space */
+    background: white; /* Ensure white background */
+  }
+
+  .tools-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem;
+    background: white; /* Ensure white background */
+    min-height: 0; /* Allow flex shrink */
   }
 
   .details-header {
@@ -1203,12 +1236,23 @@
 }
 
 .mobile-only {
-  display: none;
+  display: none !important;
 }
 
 @media (max-width: 768px) {
   .mobile-only {
-    display: block;
+    display: flex !important;
+  }
+}
+
+/* Back to list button */
+.back-to-list-button {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .back-to-list-button {
+    display: flex;
   }
 }
 

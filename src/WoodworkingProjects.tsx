@@ -20,6 +20,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
   const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showMobileDetails, setShowMobileDetails] = useState(false)
 
   // Form state
   const [formData, setFormData] = useState<ProjectFormData>({
@@ -44,9 +45,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
       const data = await projectService.getAllProjects()
       setProjects(data)
 
-      if (data.length > 0) {
-        setSelectedProject(data[0])
-      }
+      // Don't auto-select first project (let user choose)
     } catch (err) {
       console.error('Error loading projects:', err)
       setError('Failed to load projects from database')
@@ -252,11 +251,13 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
     })
     setIsEditing(false)
     setShowForm(true)
+    setShowMobileDetails(true)
   }
 
   const handleCancelForm = () => {
     setShowForm(false)
     setIsEditing(false)
+    setShowMobileDetails(false)
     setFormData({
       title: '',
       date: new Date().toISOString().split('T')[0],
@@ -385,6 +386,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
                 onClick={() => {
                   setSelectedProject(project)
                   setShowForm(false)
+                  setShowMobileDetails(true)
                 }}
                 className={`tool-item ${selectedProject?.id === project.id && !showForm ? 'selected' : ''}`}
               >
@@ -415,12 +417,36 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
         </div>
 
         {/* Right Side - Project Details or Form */}
-        <div className="tool-details-panel">
+        <div className={`tool-details-panel ${showMobileDetails ? 'show-mobile' : ''}`}>
           {showForm ? (
             <div className="tool-details">
+              {/* Back to List Button (Mobile Only) */}
+              <button
+                onClick={handleCancelForm}
+                className="back-to-list-button mobile-only"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem',
+                  background: '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  cursor: 'pointer',
+                  marginBottom: '1rem',
+                  width: '100%',
+                  justifyContent: 'center',
+                  fontWeight: '500'
+                }}
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Project List
+              </button>
+
               <div className="details-header">
                 <h2 className="details-title">{isEditing ? 'Edit Project' : 'New Project'}</h2>
-                <button onClick={handleCancelForm} className="back-button" style={{ marginLeft: 'auto' }}>
+                <button onClick={handleCancelForm} className="back-button mobile-hidden" style={{ marginLeft: 'auto' }}>
                   <X className="w-4 h-4" />
                   Cancel
                 </button>
@@ -515,6 +541,33 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
             </div>
           ) : selectedProject ? (
             <div className="tool-details">
+              {/* Back to List Button (Mobile Only) */}
+              <button
+                onClick={() => {
+                  setSelectedProject(null)
+                  setShowMobileDetails(false)
+                }}
+                className="back-to-list-button mobile-only"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem',
+                  background: '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  cursor: 'pointer',
+                  marginBottom: '1rem',
+                  width: '100%',
+                  justifyContent: 'center',
+                  fontWeight: '500'
+                }}
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Project List
+              </button>
+
               <div className="details-header">
                 <div>
                   <h2 className="details-title">{selectedProject.title}</h2>

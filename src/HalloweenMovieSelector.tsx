@@ -80,6 +80,7 @@ export default function HalloweenMovieSelector({ onNavigateBack }: HalloweenMovi
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [showMobileDetails, setShowMobileDetails] = useState(false)
 
   const apiBaseUrl = useMemo(() => {
     const configuredBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '')
@@ -131,6 +132,7 @@ export default function HalloweenMovieSelector({ onNavigateBack }: HalloweenMovi
     if (filteredMovies.length > 0) {
       const randomIndex = Math.floor(Math.random() * filteredMovies.length)
       setSelectedMovie(filteredMovies[randomIndex])
+      setShowMobileDetails(true)
     }
   }
 
@@ -219,7 +221,10 @@ export default function HalloweenMovieSelector({ onNavigateBack }: HalloweenMovi
               {filteredMovies.map((movie) => (
                 <div
                   key={movie.ratingKey}
-                  onClick={() => setSelectedMovie(movie)}
+                  onClick={() => {
+                    setSelectedMovie(movie)
+                    setShowMobileDetails(true)
+                  }}
                   className={`tool-item ${selectedMovie?.ratingKey === movie.ratingKey ? 'selected' : ''}`}
                 >
                   <div className="tool-name">{movie.title}</div>
@@ -238,9 +243,36 @@ export default function HalloweenMovieSelector({ onNavigateBack }: HalloweenMovi
           </div>
 
           {/* Right Side - Movie Details */}
-          <div className="tool-details-panel">
+          <div className={`tool-details-panel ${showMobileDetails ? 'show-mobile' : ''}`}>
             {selectedMovie ? (
               <div className="tool-details">
+                {/* Back to List Button (Mobile Only) */}
+                <button
+                  onClick={() => {
+                    setSelectedMovie(null)
+                    setShowMobileDetails(false)
+                  }}
+                  className="back-to-list-button mobile-only"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.75rem',
+                    background: '#6c757d',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.375rem',
+                    cursor: 'pointer',
+                    marginBottom: '1rem',
+                    width: '100%',
+                    justifyContent: 'center',
+                    fontWeight: '500'
+                  }}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to Movie List
+                </button>
+
                 {/* Movie Poster */}
                 <div className="movie-poster-container">
                   <img

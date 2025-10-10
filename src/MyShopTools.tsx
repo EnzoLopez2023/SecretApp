@@ -39,6 +39,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isAdding, setIsAdding] = useState(false)
   const [editForm, setEditForm] = useState<Partial<Tool>>({})
+  const [showMobileDetails, setShowMobileDetails] = useState(false)
 
   const apiBaseUrl = useMemo(() => {
     const configuredBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '')
@@ -62,9 +63,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
       const data: Tool[] = await response.json()
       setTools(data)
       
-      if (data.length > 0) {
-        setSelectedTool((prev) => prev ?? data[0])
-      }
+      // Don't auto-select first tool (let user choose)
       setError(null)
       return data
     } catch (err) {
@@ -99,6 +98,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
     })
     setIsAdding(true)
     setIsEditing(false)
+    setShowMobileDetails(true)
   }
 
   const handleEdit = () => {
@@ -113,6 +113,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
     setIsEditing(false)
     setIsAdding(false)
     setEditForm({})
+    setShowMobileDetails(false)
   }
 
   const handleSave = async () => {
@@ -279,7 +280,10 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
               <div
                 key={tool.item_id}
                 className={`tool-item ${selectedTool?.item_id === tool.item_id ? 'selected' : ''}`}
-                onClick={() => setSelectedTool(tool)}
+                onClick={() => {
+                  setSelectedTool(tool)
+                  setShowMobileDetails(true)
+                }}
               >
                 <div className="tool-name">{tool.product_name}</div>
                 <div className="tool-meta">
@@ -293,9 +297,38 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
         </div>
 
         {/* Right Panel - Tool Details or Edit Form */}
-        <div className="tool-details-panel">
-          {selectedTool ? (
+        <div className={`tool-details-panel ${showMobileDetails ? 'show-mobile' : ''}`}>
+          {selectedTool || isAdding ? (
             <div className="tool-details">
+              {/* Back to List Button (Mobile Only) */}
+              <button
+                onClick={() => {
+                  setSelectedTool(null)
+                  setIsEditing(false)
+                  setIsAdding(false)
+                  setShowMobileDetails(false)
+                }}
+                className="back-to-list-button mobile-only"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem',
+                  background: '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  cursor: 'pointer',
+                  marginBottom: '1rem',
+                  width: '100%',
+                  justifyContent: 'center',
+                  fontWeight: '500'
+                }}
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Tool List
+              </button>
+
               {/* Action Buttons */}
               {!isEditing && !isAdding && (
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
@@ -612,8 +645,8 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
                     </div>
                   </div>
                 </div>
-              ) : (
-                /* View Mode */
+              ) : selectedTool ? (
+                /* View Mode - Only show if selectedTool exists */
                 <>
                   <div className="details-header">
                     <h2>{selectedTool.product_name}</h2>
@@ -736,7 +769,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
                     )}
                   </div>
                 </>
-              )}
+              ) : null}
             </div>
           ) : (
             <div className="no-selection">
