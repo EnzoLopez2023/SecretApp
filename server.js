@@ -101,6 +101,127 @@ app.get('/api/plex/image', async (req, res) => {
   }
 })
 
+// ============================================
+// Plex Library Information Endpoints
+// ============================================
+
+// Get all library sections
+app.get('/api/plex/sections', async (req, res) => {
+  try {
+    const url = `${plexConfig.baseUrl}/library/sections?X-Plex-Token=${plexConfig.token}`
+
+    const plexResponse = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json'
+      },
+      agent: plexAgent
+    })
+
+    if (!plexResponse.ok) {
+      throw new Error(`Plex sections request failed with status ${plexResponse.status}`)
+    }
+
+    const data = await plexResponse.json()
+    res.json(data)
+  } catch (error) {
+    console.error('Plex sections fetch error:', error)
+    res.status(500).json({ error: 'Failed to fetch Plex library sections' })
+  }
+})
+
+// Get specific library section content by key
+app.get('/api/plex/sections/:key/all', async (req, res) => {
+  try {
+    const { key } = req.params
+    const url = `${plexConfig.baseUrl}/library/sections/${key}/all?X-Plex-Token=${plexConfig.token}`
+
+    const plexResponse = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json'
+      },
+      agent: plexAgent
+    })
+
+    if (!plexResponse.ok) {
+      throw new Error(`Plex library section request failed with status ${plexResponse.status}`)
+    }
+
+    const data = await plexResponse.json()
+    res.json(data)
+  } catch (error) {
+    console.error('Plex library section fetch error:', error)
+    res.status(500).json({ error: 'Failed to fetch Plex library section content' })
+  }
+})
+
+// Get library statistics (helper endpoint for chatbot)
+app.get('/api/plex/stats', async (req, res) => {
+  try {
+    // Get all sections
+    const sectionsUrl = `${plexConfig.baseUrl}/library/sections?X-Plex-Token=${plexConfig.token}`
+    const sectionsResponse = await fetch(sectionsUrl, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      agent: plexAgent
+    })
+
+    if (!sectionsResponse.ok) {
+      throw new Error(`Plex sections request failed`)
+    }
+
+    const sectionsData = await sectionsResponse.json()
+    const sections = sectionsData.MediaContainer?.Directory || []
+
+    // Build stats for each section
+    const stats = await Promise.all(
+      sections.map(async (section) => {
+        try {
+          const contentUrl = `${plexConfig.baseUrl}/library/sections/${section.key}/all?X-Plex-Token=${plexConfig.token}`
+          const contentResponse = await fetch(contentUrl, {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+            agent: plexAgent
+          })
+
+          if (contentResponse.ok) {
+            const contentData = await contentResponse.json()
+            return {
+              key: section.key,
+              title: section.title,
+              type: section.type,
+              count: contentData.MediaContainer?.size || 0,
+              uuid: section.uuid
+            }
+          }
+          return {
+            key: section.key,
+            title: section.title,
+            type: section.type,
+            count: 0,
+            uuid: section.uuid
+          }
+        } catch (err) {
+          console.error(`Error fetching stats for section ${section.key}:`, err)
+          return {
+            key: section.key,
+            title: section.title,
+            type: section.type,
+            count: 0,
+            error: 'Failed to fetch count'
+          }
+        }
+      })
+    )
+
+    res.json({ libraries: stats })
+  } catch (error) {
+    console.error('Plex stats fetch error:', error)
+    res.status(500).json({ error: 'Failed to fetch Plex library statistics' })
+  }
+})
+
 // Test database connection endpoint
 app.get('/api/test', async (req, res) => {
   try {
