@@ -28,12 +28,7 @@ export default function App() {
           <NavigationSidebar currentView={currentView} onNavigate={navigateToView} />
           <Box sx={{ flexGrow: 1 }}>
             {currentView === 'chat' && (
-              <ChatApp 
-                onNavigateToShop={() => navigateToView('shop')}
-                onNavigateToHalloween={() => navigateToView('halloween')}
-                onNavigateToWoodworking={() => navigateToView('woodworking')}
-                onNavigateToConverter={() => navigateToView('converter')} 
-              />
+              <ChatApp />
             )}
             {currentView === 'shop' && (
               <MyShopTools onNavigateBack={navigateToDashboard} />

@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { FileSpreadsheet, Package, Film, Hammer } from 'lucide-react'
 import shopData from './assets/MyShop.json'
 import { isPlexQuestion, generatePlexContext } from './ChatAgent/PlexAgent'
 import './App.css'
@@ -202,14 +201,7 @@ const generateShopContext = (question: string): string => {
   return context
 }
 
-interface ChatAppProps {
-  onNavigateToConverter: () => void;
-  onNavigateToShop: () => void;
-  onNavigateToHalloween: () => void;
-  onNavigateToWoodworking: () => void;
-}
-
-export default function ChatApp({ onNavigateToConverter, onNavigateToShop, onNavigateToHalloween, onNavigateToWoodworking }: ChatAppProps) {
+export default function ChatApp() {
   const [question, setQuestion] = useState('')
   const [response, setResponse] = useState('')
   const [loading, setLoading] = useState(false)
@@ -317,41 +309,6 @@ export default function ChatApp({ onNavigateToConverter, onNavigateToShop, onNav
 
   return (
     <div className="app">
-      {/* Navigation Header */}
-      <div className="app-header">
-        <h1>AI Chat Assistant</h1>
-        <div className="nav-buttons">
-          <button
-            onClick={onNavigateToShop}
-            className="nav-button"
-          >
-            <Package className="w-4 h-4" />
-            My Shop Tools
-          </button>
-          <button
-            onClick={onNavigateToWoodworking}
-            className="nav-button"
-          >
-            <Hammer className="w-4 h-4" />
-            Woodworking Projects
-          </button>
-          <button
-            onClick={onNavigateToHalloween}
-            className="nav-button"
-          >
-            <Film className="w-4 h-4" />
-            Halloween Movies
-          </button>
-          <button
-            onClick={onNavigateToConverter}
-            className="nav-button"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Excel to JSON Converter
-          </button>
-        </div>
-      </div>
-      
       <div className="app-content">
         <div className="left-panel">
           <h2>Ask a Question</h2>
