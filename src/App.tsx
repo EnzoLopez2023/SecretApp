@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { Box } from '@mui/material'
+import Dashboard from './Dashboard'
+import NavigationSidebar from './NavigationSidebar'
 import ChatApp from './ChatApp'
 import ExcelToJsonConverter from './ExcelToJsonConverter'
 import MyShopTools from './MyShopTools'
@@ -6,38 +9,46 @@ import HalloweenMovieSelector from './HalloweenMovieSelector'
 import WoodworkingProjects from './WoodworkingProjects'
 import './App.css'
 
-type AppView = 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter'
+type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter'
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<AppView>('chat')
+  const [currentView, setCurrentView] = useState<AppView>('dashboard')
 
-  const navigateToShop = () => setCurrentView('shop')
-  const navigateToChat = () => setCurrentView('chat')
-  const navigateToHalloween = () => setCurrentView('halloween')
-  const navigateToWoodworking = () => setCurrentView('woodworking')
-  const navigateToConverter = () => setCurrentView('converter')
+  const navigateToView = (view: AppView) => setCurrentView(view)
+  const navigateToDashboard = () => setCurrentView('dashboard')
 
   return (
     <>
-      {currentView === 'chat' && (
-        <ChatApp 
-          onNavigateToShop={navigateToShop}
-          onNavigateToHalloween={navigateToHalloween}
-          onNavigateToWoodworking={navigateToWoodworking}
-          onNavigateToConverter={navigateToConverter} 
-        />
-      )}
-      {currentView === 'shop' && (
-        <MyShopTools onNavigateBack={navigateToChat} />
-      )}
-      {currentView === 'halloween' && (
-        <HalloweenMovieSelector onNavigateBack={navigateToChat} />
-      )}
-      {currentView === 'woodworking' && (
-        <WoodworkingProjects onNavigateBack={navigateToChat} />
-      )}
-      {currentView === 'converter' && (
-        <ExcelToJsonConverter onNavigateBack={navigateToChat} />
+      {/* Dashboard - includes its own sidebar */}
+      <Dashboard currentView={currentView} onNavigate={navigateToView} />
+      
+      {/* Other pages - with shared navigation sidebar */}
+      {currentView !== 'dashboard' && (
+        <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+          <NavigationSidebar currentView={currentView} onNavigate={navigateToView} />
+          <Box sx={{ flexGrow: 1 }}>
+            {currentView === 'chat' && (
+              <ChatApp 
+                onNavigateToShop={() => navigateToView('shop')}
+                onNavigateToHalloween={() => navigateToView('halloween')}
+                onNavigateToWoodworking={() => navigateToView('woodworking')}
+                onNavigateToConverter={() => navigateToView('converter')} 
+              />
+            )}
+            {currentView === 'shop' && (
+              <MyShopTools onNavigateBack={navigateToDashboard} />
+            )}
+            {currentView === 'halloween' && (
+              <HalloweenMovieSelector onNavigateBack={navigateToDashboard} />
+            )}
+            {currentView === 'woodworking' && (
+              <WoodworkingProjects onNavigateBack={navigateToDashboard} />
+            )}
+            {currentView === 'converter' && (
+              <ExcelToJsonConverter onNavigateBack={navigateToDashboard} />
+            )}
+          </Box>
+        </Box>
       )}
     </>
   )
