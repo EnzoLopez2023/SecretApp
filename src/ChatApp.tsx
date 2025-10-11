@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FileSpreadsheet, Package, Film, Hammer } from 'lucide-react'
 import shopData from './assets/MyShop.json'
+import { isPlexQuestion, generatePlexContext } from './ChatAgent/PlexAgent'
 import './App.css'
 
 // Define the type for inventory items
@@ -197,89 +198,6 @@ const generateShopContext = (question: string): string => {
   }
   
   context += `\nPlease answer the user's question using this inventory data. Format currency as USD dollars and be specific with numbers and details.`
-  
-  return context
-}
-
-// ============================================
-// Plex Library Analysis
-// ============================================
-
-// Detect if question is about Plex libraries
-const isPlexQuestion = (question: string): boolean => {
-  const plexKeywords = [
-    'library', 'libraries', 'plex', 'movie', 'movies', 'show', 'shows', 'tv', 'media',
-    '4k', 'halloween', 'anime', 'collection', 'watch', 'watching', 'film', 'films'
-  ]
-  
-  const lowerQuestion = question.toLowerCase()
-  return plexKeywords.some(keyword => lowerQuestion.includes(keyword))
-}
-
-// Fetch Plex library statistics
-const fetchPlexStats = async (apiBaseUrl: string): Promise<any> => {
-  try {
-    const response = await fetch(`${apiBaseUrl}/plex/stats`)
-    if (!response.ok) {
-      throw new Error('Failed to fetch Plex stats')
-    }
-    return await response.json()
-  } catch (error) {
-    console.error('Error fetching Plex stats:', error)
-    return null
-  }
-}
-
-// Generate context for Plex-related questions
-const generatePlexContext = async (question: string, apiBaseUrl: string): Promise<string> => {
-  const lowerQuestion = question.toLowerCase()
-  let context = `\n\nYou have access to the user's Plex media library data. Here's the information:\n`
-  
-  try {
-    const plexData = await fetchPlexStats(apiBaseUrl)
-    
-    if (!plexData || !plexData.libraries) {
-      return context + `- Unable to fetch library data at this time.\n`
-    }
-    
-    const libraries = plexData.libraries
-    
-    // List all available libraries
-    context += `\nAvailable libraries:\n`
-    libraries.forEach((lib: any) => {
-      context += `- "${lib.title}" (${lib.type}): ${lib.count} items\n`
-    })
-    
-    // Check for specific library mentions
-    const matchedLibrary = libraries.find((lib: any) => 
-      lowerQuestion.includes(lib.title.toLowerCase())
-    )
-    
-    if (matchedLibrary) {
-      context += `\nRequested library "${matchedLibrary.title}":\n`
-      context += `- Type: ${matchedLibrary.type}\n`
-      context += `- Total items: ${matchedLibrary.count}\n`
-    }
-    
-    // Calculate total counts
-    const totalMovies = libraries
-      .filter((lib: any) => lib.type === 'movie')
-      .reduce((sum: number, lib: any) => sum + lib.count, 0)
-    
-    const totalShows = libraries
-      .filter((lib: any) => lib.type === 'show')
-      .reduce((sum: number, lib: any) => sum + lib.count, 0)
-    
-    context += `\nTotal across all libraries:\n`
-    if (totalMovies > 0) context += `- Movies: ${totalMovies}\n`
-    if (totalShows > 0) context += `- TV Shows: ${totalShows}\n`
-    
-    context += `\nPlease answer the user's question using this Plex library data. Be specific with library names and counts.`
-    
-  } catch (error) {
-    console.error('Error generating Plex context:', error)
-    context += `- Error fetching library information.\n`
-  }
   
   return context
 }
