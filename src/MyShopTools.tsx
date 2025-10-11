@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { ArrowLeft, Package, MapPin, DollarSign, Hash, Calendar, ExternalLink, Building, Tag, Plus, Edit2, Trash2, Save, X } from 'lucide-react'
+import { ArrowLeft, Package, MapPin, DollarSign, Hash, Calendar, ExternalLink, Building, Tag, Plus, Edit2, Trash2, Save, X, Image as ImageIcon, Upload, XCircle } from 'lucide-react'
 
 // Define the Tool type based on the expected structure from MySQL database
 type Tool = {
@@ -26,6 +26,15 @@ type Tool = {
   spare2?: string
 }
 
+type ToolImage = {
+  id: number
+  inventory_id: number
+  image_name: string
+  image_type: string
+  image_size: number
+  uploaded_at: string
+}
+
 interface MyShopToolsProps {
   onNavigateBack: () => void
 }
@@ -40,6 +49,10 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [editForm, setEditForm] = useState<Partial<Tool>>({})
   const [showMobileDetails, setShowMobileDetails] = useState(false)
+  const [images, setImages] = useState<ToolImage[]>([])
+  const [selectedImages, setSelectedImages] = useState<File[]>([])
+  const [imagesToDelete, setImagesToDelete] = useState<number[]>([])
+  const [viewingImage, setViewingImage] = useState<number | null>(null)
 
   const apiBaseUrl = useMemo(() => {
     const configuredBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '')
@@ -79,6 +92,98 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
     fetchTools()
   }, [fetchTools])
 
+  const fetchImages = useCallback(async (inventoryId: number) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/inventory/${inventoryId}/images`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch images')
+      }
+      const data: ToolImage[] = await response.json()
+      setImages(data)
+    } catch (err) {
+      console.error('Error fetching images:', err)
+      setImages([])
+    }
+  }, [apiBaseUrl])
+
+  useEffect(() => {
+    if (selectedTool?.id) {
+      fetchImages(selectedTool.id)
+    } else {
+      setImages([])
+    }
+  }, [selectedTool, fetchImages])
+
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (files) {
+      const newImages = Array.from(files).filter(file => file.type.startsWith('image/'))
+      setSelectedImages(prev => [...prev, ...newImages])
+    }
+  }
+
+  const handleRemoveSelectedImage = (index: number) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleMarkImageForDeletion = (imageId: number) => {
+    setImagesToDelete(prev => 
+      prev.includes(imageId) 
+        ? prev.filter(id => id !== imageId) 
+        : [...prev, imageId]
+    )
+  }
+
+  const uploadImages = async (inventoryId: number) => {
+    for (const file of selectedImages) {
+      try {
+        const reader = new FileReader()
+        const imageData = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => {
+            const base64 = (reader.result as string).split(',')[1]
+            resolve(base64)
+          }
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+
+        const response = await fetch(`${apiBaseUrl}/inventory/${inventoryId}/images`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageName: file.name,
+            imageData,
+            imageType: file.type
+          })
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to upload ${file.name}`)
+        }
+      } catch (err) {
+        console.error('Error uploading image:', err)
+        alert(`Failed to upload ${file.name}`)
+      }
+    }
+  }
+
+  const deleteMarkedImages = async () => {
+    for (const imageId of imagesToDelete) {
+      try {
+        const response = await fetch(`${apiBaseUrl}/inventory/images/${imageId}`, {
+          method: 'DELETE'
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to delete image ${imageId}`)
+        }
+      } catch (err) {
+        console.error('Error deleting image:', err)
+        alert(`Failed to delete image ${imageId}`)
+      }
+    }
+  }
+
   const handleAdd = () => {
     // Get the next available item_id
     const maxItemId = tools.length > 0 ? Math.max(...tools.map(t => t.item_id)) : 0
@@ -106,6 +211,8 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
       setEditForm({ ...selectedTool })
       setIsEditing(true)
       setIsAdding(false)
+      setSelectedImages([])
+      setImagesToDelete([])
     }
   }
 
@@ -114,10 +221,14 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
     setIsAdding(false)
     setEditForm({})
     setShowMobileDetails(false)
+    setSelectedImages([])
+    setImagesToDelete([])
   }
 
   const handleSave = async () => {
     try {
+      let inventoryId: number | undefined
+
       if (isAdding) {
         // Create new item
         const response = await fetch(`${apiBaseUrl}/inventory`, {
@@ -131,6 +242,8 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
         }
 
         const result = await response.json()
+        inventoryId = result.id
+        
         const refreshedTools = await fetchTools()
         const newTool = refreshedTools.find((t) => t.id === result.id)
         if (newTool) {
@@ -139,6 +252,7 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
       } else {
         // Update existing item
         if (!selectedTool?.id) return
+        inventoryId = selectedTool.id
 
         const response = await fetch(`${apiBaseUrl}/inventory/${selectedTool.id}`, {
           method: 'PUT',
@@ -150,6 +264,11 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
           throw new Error('Failed to update item')
         }
 
+        // Delete marked images
+        if (imagesToDelete.length > 0) {
+          await deleteMarkedImages()
+        }
+
         const refreshedTools = await fetchTools()
         const updatedTool = refreshedTools.find((t) => t.id === selectedTool.id)
         if (updatedTool) {
@@ -157,9 +276,21 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
         }
       }
 
+      // Upload new images
+      if (selectedImages.length > 0 && inventoryId) {
+        await uploadImages(inventoryId)
+      }
+
+      // Refresh images
+      if (inventoryId) {
+        await fetchImages(inventoryId)
+      }
+
       setIsEditing(false)
       setIsAdding(false)
       setEditForm({})
+      setSelectedImages([])
+      setImagesToDelete([])
     } catch (err) {
       console.error('Error saving item:', err)
       alert(err instanceof Error ? err.message : 'Failed to save item')
@@ -598,6 +729,157 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
                       />
                     </div>
 
+                    {/* Images Section */}
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#1f2937' }}>
+                        <ImageIcon className="w-4 h-4" style={{ display: 'inline', marginRight: '0.5rem' }} />
+                        Images
+                      </label>
+
+                      {/* Existing Images (Edit Mode) */}
+                      {!isAdding && images.length > 0 && (
+                        <div style={{ marginBottom: '1rem' }}>
+                          <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+                            Current Images (click to mark for deletion):
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '0.5rem' }}>
+                            {images.map((img) => (
+                              <div
+                                key={img.id}
+                                onClick={() => handleMarkImageForDeletion(img.id)}
+                                style={{
+                                  position: 'relative',
+                                  cursor: 'pointer',
+                                  border: imagesToDelete.includes(img.id) ? '2px solid #ef4444' : '2px solid #e5e7eb',
+                                  borderRadius: '0.375rem',
+                                  padding: '0.25rem',
+                                  background: imagesToDelete.includes(img.id) ? '#fee' : 'white',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                <img
+                                  src={`${apiBaseUrl}/inventory/images/${img.id}`}
+                                  alt={img.image_name}
+                                  style={{
+                                    width: '100%',
+                                    height: '100px',
+                                    objectFit: 'cover',
+                                    borderRadius: '0.25rem',
+                                    opacity: imagesToDelete.includes(img.id) ? 0.5 : 1
+                                  }}
+                                />
+                                {imagesToDelete.includes(img.id) && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: '50%',
+                                    left: '50%',
+                                    transform: 'translate(-50%, -50%)',
+                                    color: '#ef4444',
+                                    fontWeight: 'bold',
+                                    fontSize: '0.875rem'
+                                  }}>
+                                    <XCircle className="w-8 h-8" />
+                                  </div>
+                                )}
+                                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {img.image_name}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* New Images to Upload */}
+                      {selectedImages.length > 0 && (
+                        <div style={{ marginBottom: '1rem' }}>
+                          <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.5rem' }}>
+                            New Images to Upload:
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '0.5rem' }}>
+                            {selectedImages.map((file, index) => (
+                              <div
+                                key={index}
+                                style={{
+                                  position: 'relative',
+                                  border: '2px solid #10b981',
+                                  borderRadius: '0.375rem',
+                                  padding: '0.25rem',
+                                  background: '#f0fdf4'
+                                }}
+                              >
+                                <img
+                                  src={URL.createObjectURL(file)}
+                                  alt={file.name}
+                                  style={{
+                                    width: '100%',
+                                    height: '100px',
+                                    objectFit: 'cover',
+                                    borderRadius: '0.25rem'
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveSelectedImage(index)}
+                                  style={{
+                                    position: 'absolute',
+                                    top: '0.25rem',
+                                    right: '0.25rem',
+                                    background: '#ef4444',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '50%',
+                                    width: '24px',
+                                    height: '24px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    padding: 0
+                                  }}
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {file.name}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Upload Button */}
+                      <div>
+                        <input
+                          type="file"
+                          id="image-upload"
+                          multiple
+                          accept="image/*"
+                          onChange={handleImageSelect}
+                          style={{ display: 'none' }}
+                        />
+                        <label
+                          htmlFor="image-upload"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.5rem 1rem',
+                            background: '#6366f1',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '0.375rem',
+                            cursor: 'pointer',
+                            fontWeight: '500'
+                          }}
+                        >
+                          <Upload className="w-4 h-4" />
+                          Add Images
+                        </label>
+                      </div>
+                    </div>
+
                     {/* Action Buttons */}
                     <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
                       <button
@@ -767,6 +1049,66 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
                         </div>
                       </div>
                     )}
+
+                    {/* Images Section */}
+                    {images.length > 0 && (
+                      <div className="detail-section">
+                        <div className="section-title">
+                          <ImageIcon className="w-4 h-4" />
+                          Images ({images.length})
+                        </div>
+                        <div style={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', 
+                          gap: '1rem',
+                          marginTop: '0.5rem'
+                        }}>
+                          {images.map((img) => (
+                            <div
+                              key={img.id}
+                              onClick={() => setViewingImage(img.id)}
+                              style={{
+                                cursor: 'pointer',
+                                border: '2px solid #e5e7eb',
+                                borderRadius: '0.5rem',
+                                padding: '0.5rem',
+                                transition: 'all 0.2s',
+                                background: 'white'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = '#3b82f6'
+                                e.currentTarget.style.transform = 'scale(1.05)'
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = '#e5e7eb'
+                                e.currentTarget.style.transform = 'scale(1)'
+                              }}
+                            >
+                              <img
+                                src={`${apiBaseUrl}/inventory/images/${img.id}`}
+                                alt={img.image_name}
+                                style={{
+                                  width: '100%',
+                                  height: '150px',
+                                  objectFit: 'cover',
+                                  borderRadius: '0.375rem'
+                                }}
+                              />
+                              <div style={{ 
+                                fontSize: '0.75rem', 
+                                color: '#6b7280', 
+                                marginTop: '0.5rem',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {img.image_name}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </>
               ) : null}
@@ -779,6 +1121,61 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
           )}
         </div>
       </div>
+
+      {/* Image Modal */}
+      {viewingImage !== null && (
+        <div
+          onClick={() => setViewingImage(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '2rem',
+            cursor: 'pointer'
+          }}
+        >
+          <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}>
+            <button
+              onClick={() => setViewingImage(null)}
+              style={{
+                position: 'absolute',
+                top: '-2.5rem',
+                right: 0,
+                background: 'white',
+                border: 'none',
+                borderRadius: '50%',
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+              }}
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img
+              src={`${apiBaseUrl}/inventory/images/${viewingImage}`}
+              alt="Full size"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '90vh',
+                objectFit: 'contain',
+                borderRadius: '0.5rem'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

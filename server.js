@@ -569,6 +569,103 @@ app.delete('/api/inventory/:id', async (req, res) => {
   }
 })
 
+// ============================================
+// MyShop Images API Endpoints
+// ============================================
+
+// Get all images for an inventory item
+app.get('/api/inventory/:id/images', async (req, res) => {
+  try {
+    const { id } = req.params
+    const [images] = await pool.query(
+      'SELECT id, inventory_id, image_name, image_type, image_size, uploaded_at FROM myshop_images WHERE inventory_id = ? ORDER BY uploaded_at DESC',
+      [id]
+    )
+    res.json(images)
+  } catch (error) {
+    console.error('Get inventory images error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Upload image for an inventory item
+app.post('/api/inventory/:id/images', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { imageName, imageData, imageType } = req.body
+    
+    if (!imageName || !imageData || !imageType) {
+      return res.status(400).json({ error: 'Missing required fields: imageName, imageData, imageType' })
+    }
+    
+    // Verify inventory item exists
+    const [[item]] = await pool.query('SELECT id FROM myshop_inventory WHERE id = ?', [id])
+    if (!item) {
+      return res.status(404).json({ error: 'Inventory item not found' })
+    }
+    
+    const buffer = Buffer.from(imageData, 'base64')
+    const imageSize = buffer.length
+    
+    console.log(`Uploading image: ${imageName}, size: ${imageSize} bytes, type: ${imageType}`)
+    
+    const [result] = await pool.query(
+      'INSERT INTO myshop_images (inventory_id, image_name, image_data, image_type, image_size) VALUES (?, ?, ?, ?, ?)',
+      [id, imageName, buffer, imageType, imageSize]
+    )
+    
+    res.json({ 
+      success: true, 
+      imageId: result.insertId,
+      imageName,
+      imageType,
+      imageSize
+    })
+  } catch (error) {
+    console.error('Image upload error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Get single image data
+app.get('/api/inventory/images/:imageId', async (req, res) => {
+  try {
+    const { imageId } = req.params
+    const [[image]] = await pool.query(
+      'SELECT image_name, image_data, image_type FROM myshop_images WHERE id = ?',
+      [imageId]
+    )
+    
+    if (!image) {
+      return res.status(404).json({ error: 'Image not found' })
+    }
+    
+    res.setHeader('Content-Type', image.image_type)
+    res.setHeader('Content-Disposition', `inline; filename="${image.image_name}"`)
+    res.send(image.image_data)
+  } catch (error) {
+    console.error('Get image error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Delete image
+app.delete('/api/inventory/images/:imageId', async (req, res) => {
+  try {
+    const { imageId } = req.params
+    const [result] = await pool.query('DELETE FROM myshop_images WHERE id = ?', [imageId])
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Image not found' })
+    }
+    
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Delete image error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
 const PORT = 3001
 app.listen(PORT, () => {
   console.log(`🚀 SharePoint API Server running on http://localhost:${PORT}`)
