@@ -15,7 +15,6 @@ export default function App() {
   const [currentView, setCurrentView] = useState<AppView>('dashboard')
 
   const navigateToView = (view: AppView) => setCurrentView(view)
-  const navigateToDashboard = () => setCurrentView('dashboard')
 
   return (
     <>
@@ -31,16 +30,16 @@ export default function App() {
               <ChatApp />
             )}
             {currentView === 'shop' && (
-              <MyShopTools onNavigateBack={navigateToDashboard} />
+              <MyShopTools />
             )}
             {currentView === 'halloween' && (
-              <HalloweenMovieSelector onNavigateBack={navigateToDashboard} />
+              <HalloweenMovieSelector />
             )}
             {currentView === 'woodworking' && (
-              <WoodworkingProjects onNavigateBack={navigateToDashboard} />
+              <WoodworkingProjects />
             )}
             {currentView === 'converter' && (
-              <ExcelToJsonConverter onNavigateBack={navigateToDashboard} />
+              <ExcelToJsonConverter />
             )}
           </Box>
         </Box>

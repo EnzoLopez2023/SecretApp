@@ -1,17 +1,13 @@
 import React, { useState } from 'react';
-import { Upload, Download, FileSpreadsheet, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Upload, Download, FileSpreadsheet, AlertCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
-
-interface ExcelToJsonConverterProps {
-  onNavigateBack: () => void;
-}
 
 // Define proper types for your Excel data
 type ExcelRowData = Record<string, string | number | boolean | null>;
 type ExcelSheetData = ExcelRowData[];
 type ConvertedData = Record<string, ExcelSheetData>;
 
-export default function ExcelToJsonConverter({ onNavigateBack }: ExcelToJsonConverterProps) {
+export default function ExcelToJsonConverter() {
   const [jsonData, setJsonData] = useState<ConvertedData | null>(null);
   const [fileName, setFileName] = useState('');
   const [error, setError] = useState('');
@@ -77,14 +73,6 @@ export default function ExcelToJsonConverter({ onNavigateBack }: ExcelToJsonConv
     <div className="shop-tools-container">
       {/* Header */}
       <div className="shop-header">
-        <button
-          onClick={onNavigateBack}
-          className="back-button"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Chat
-        </button>
-        
         <div className="header-title">
           <FileSpreadsheet className="w-6 h-6" />
           <h1>Excel to JSON Converter</h1>

@@ -17,8 +17,6 @@ import {
   Skeleton,
   Alert,
   Snackbar,
-  AppBar,
-  Toolbar,
   Stack,
 } from '@mui/material'
 import {
@@ -75,11 +73,7 @@ type ToolImage = {
   uploaded_at: string
 }
 
-interface MyShopToolsProps {
-  onNavigateBack: () => void
-}
-
-export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
+export default function MyShopTools() {
   const [tools, setTools] = useState<Tool[]>([])
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -380,28 +374,6 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
 
   return (
     <Container maxWidth="xl" sx={{ py: 2 }}>
-      {/* Header */}
-      <AppBar position="static" sx={{ mb: 3, borderRadius: 1 }}>
-        <Toolbar>
-          <IconButton
-            edge="start"
-            color="inherit"
-            onClick={onNavigateBack}
-            sx={{ mr: 2 }}
-          >
-            <ArrowBack />
-          </IconButton>
-          <Inventory sx={{ mr: 1 }} />
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            My Shop Tools
-          </Typography>
-          <Chip
-            label={loading ? 'Loading...' : `${filteredTools.length} tools`}
-            color="secondary"
-            variant="outlined"
-          />
-        </Toolbar>
-      </AppBar>
 
       {/* Error Alert */}
       <Snackbar
@@ -418,34 +390,81 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
       <Box sx={{ display: 'flex', gap: 3, height: 'calc(100vh - 200px)' }}>
         {/* Left Panel - Tool List */}
         <Box sx={{ width: { xs: '100%', md: '400px' }, flexShrink: 0, display: { xs: showMobileDetails ? 'none' : 'block', md: 'block' } }}>
-          <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {/* Search and Add Button */}
-            <Stack spacing={2} sx={{ mb: 2 }}>
+          <Paper sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+            {/* Header with Count */}
+            <Box sx={{ mb: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Inventory color="primary" />
+                  <Typography variant="h6" fontWeight={600}>
+                    My Shop Tools
+                  </Typography>
+                </Box>
+                <Chip
+                  icon={<Inventory />}
+                  label={loading ? 'Loading...' : `${filteredTools.length} tools`}
+                  color="primary"
+                  variant="outlined"
+                  size="small"
+                />
+              </Box>
+              
+              {/* Modern Search Box */}
               <TextField
                 fullWidth
-                placeholder="Search tools..."
+                placeholder="Search tools, companies, SKUs..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <Search />
+                      <Search color="action" />
                     </InputAdornment>
                   ),
                 }}
                 variant="outlined"
-                size="small"
+                size="medium"
+                sx={{
+                  mb: 2,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    backgroundColor: 'background.default',
+                    '&:hover': {
+                      backgroundColor: 'action.hover',
+                    },
+                    '&.Mui-focused': {
+                      backgroundColor: 'background.paper',
+                    },
+                  },
+                }}
               />
+              
+              {/* Modern Add Button */}
               <Button
                 variant="contained"
                 startIcon={<Add />}
                 onClick={handleAdd}
                 fullWidth
-                color="success"
+                size="large"
+                sx={{
+                  borderRadius: 2,
+                  py: 1.5,
+                  textTransform: 'none',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                  boxShadow: '0 3px 5px 2px rgba(33, 203, 243, .3)',
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #1976D2 30%, #1CB5E0 90%)',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 6px 10px 2px rgba(33, 203, 243, .3)',
+                  },
+                  transition: 'all 0.3s ease',
+                }}
               >
                 Add New Tool
               </Button>
-            </Stack>
+            </Box>
 
             {/* Tools List */}
             <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
@@ -531,6 +550,22 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
                       variant="contained"
                       color="primary"
                       fullWidth
+                      size="large"
+                      sx={{
+                        borderRadius: 2,
+                        py: 1.5,
+                        textTransform: 'none',
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        background: 'linear-gradient(45deg, #4CAF50 30%, #8BC34A 90%)',
+                        boxShadow: '0 3px 5px 2px rgba(76, 175, 80, .3)',
+                        '&:hover': {
+                          background: 'linear-gradient(45deg, #388E3C 30%, #689F38 90%)',
+                          transform: 'translateY(-1px)',
+                          boxShadow: '0 6px 10px 2px rgba(76, 175, 80, .3)',
+                        },
+                        transition: 'all 0.3s ease',
+                      }}
                     >
                       Edit
                     </Button>
@@ -540,6 +575,22 @@ export default function MyShopTools({ onNavigateBack }: MyShopToolsProps) {
                       variant="contained"
                       color="error"
                       fullWidth
+                      size="large"
+                      sx={{
+                        borderRadius: 2,
+                        py: 1.5,
+                        textTransform: 'none',
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        background: 'linear-gradient(45deg, #f44336 30%, #ff7961 90%)',
+                        boxShadow: '0 3px 5px 2px rgba(244, 67, 54, .3)',
+                        '&:hover': {
+                          background: 'linear-gradient(45deg, #d32f2f 30%, #f57c00 90%)',
+                          transform: 'translateY(-1px)',
+                          boxShadow: '0 6px 10px 2px rgba(244, 67, 54, .3)',
+                        },
+                        transition: 'all 0.3s ease',
+                      }}
                     >
                       Delete
                     </Button>

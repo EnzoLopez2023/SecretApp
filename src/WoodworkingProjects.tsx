@@ -1,17 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { getDocument, GlobalWorkerOptions, version as pdfjsVersion } from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import { ArrowLeft, Hammer, Plus, Calendar, FileText, Paperclip, Save, X, Edit2, Trash2, Download, Upload } from 'lucide-react'
+import { ArrowLeft, Calendar, FileText, Paperclip, X, Trash2, Download, Upload } from 'lucide-react'
+import { Box, Typography, Chip, Button } from '@mui/material'
+import { Build as BuildIcon, Add, Edit, Delete, Save as SaveIcon, Close } from '@mui/icons-material'
 import projectService, { type WoodworkingProject, type ProjectFile, type ProjectFormData } from './services/projectService'
 import './App.css'
 
 GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsVersion}/pdf.worker.min.js`
 
-interface WoodworkingProjectsProps {
-  onNavigateBack: () => void
-}
-
-export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProjectsProps) {
+export default function WoodworkingProjects() {
   const [projects, setProjects] = useState<WoodworkingProject[]>([])
   const [selectedProject, setSelectedProject] = useState<WoodworkingProject | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -332,26 +330,34 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
   return (
     <div className="shop-tools-container">
       {/* Header */}
-      <div className="shop-header">
-        <button onClick={onNavigateBack} className="back-button">
-          <ArrowLeft className="w-4 h-4" />
-          Back to Chat
-        </button>
-
-        <div className="header-title">
-          <Hammer className="w-6 h-6" />
-          <h1>Woodworking Projects</h1>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <button onClick={testConnection} className="back-button" title="Test Database Connection" style={{ backgroundColor: '#28a745' }}>
-            🔧 Test
-          </button>
-          <div className="tools-count">
-            {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}
-          </div>
-        </div>
-      </div>
+      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <BuildIcon color="primary" />
+            <Typography variant="h5" component="h1" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+              Woodworking Projects
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <Button
+              onClick={testConnection}
+              variant="outlined"
+              size="small"
+              sx={{ minWidth: 'auto', px: 1 }}
+              title="Test Database Connection"
+            >
+              🔧 Test
+            </Button>
+            <Chip
+              icon={<BuildIcon />}
+              label={loading ? 'Loading...' : `${filteredProjects.length} project${filteredProjects.length !== 1 ? 's' : ''}`}
+              color="primary"
+              variant="outlined"
+              size="small"
+            />
+          </Box>
+        </Box>
+      </Box>
 
       {error && (
         <div style={{ padding: '1rem', backgroundColor: '#fff3cd', borderBottom: '1px solid #ffc107', color: '#856404' }}>
@@ -363,10 +369,30 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
         {/* Left Side - Project List */}
         <div className="tools-list-panel">
           <div className="search-section">
-            <button onClick={handleNewProject} className="random-button">
-              <Plus className="w-4 h-4" />
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={handleNewProject}
+              fullWidth
+              size="large"
+              sx={{
+                borderRadius: 2,
+                py: 1.5,
+                textTransform: 'none',
+                fontSize: '1rem',
+                fontWeight: 600,
+                background: 'linear-gradient(45deg, #FF6B35 30%, #F7931E 90%)',
+                boxShadow: '0 3px 5px 2px rgba(255, 107, 53, .3)',
+                '&:hover': {
+                  background: 'linear-gradient(45deg, #E55A2B 30%, #E8841A 90%)',
+                  transform: 'translateY(-1px)',
+                  boxShadow: '0 6px 10px 2px rgba(255, 107, 53, .3)',
+                },
+                transition: 'all 0.3s ease',
+              }}
+            >
               New Project
-            </button>
+            </Button>
           </div>
 
           <div className="search-section" style={{ paddingTop: '0.5rem' }}>
@@ -446,10 +472,28 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
 
               <div className="details-header">
                 <h2 className="details-title">{isEditing ? 'Edit Project' : 'New Project'}</h2>
-                <button onClick={handleCancelForm} className="back-button mobile-hidden" style={{ marginLeft: 'auto' }}>
-                  <X className="w-4 h-4" />
+                <Button
+                  onClick={handleCancelForm}
+                  variant="outlined"
+                  startIcon={<Close />}
+                  sx={{
+                    ml: 'auto',
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    borderColor: 'grey.400',
+                    color: 'grey.600',
+                    '&:hover': {
+                      borderColor: 'grey.600',
+                      backgroundColor: 'grey.50',
+                      transform: 'translateY(-1px)',
+                    },
+                    transition: 'all 0.3s ease',
+                    display: { xs: 'none', sm: 'flex' },
+                  }}
+                >
                   Cancel
-                </button>
+                </Button>
               </div>
 
               <form onSubmit={handleSubmit} className="project-form">
@@ -533,10 +577,33 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
                   )}
                 </div>
 
-                <button type="submit" className="random-button" style={{ marginTop: '1rem' }} disabled={uploading}>
-                  <Save className="w-4 h-4" />
+                <Button
+                  type="submit"
+                  variant="contained"
+                  startIcon={<SaveIcon />}
+                  disabled={uploading}
+                  sx={{
+                    mt: 2,
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                    boxShadow: '0 3px 5px 2px rgba(33, 203, 243, .3)',
+                    '&:hover': {
+                      background: 'linear-gradient(45deg, #1976D2 30%, #1CB5E0 90%)',
+                      transform: 'translateY(-1px)',
+                      boxShadow: '0 6px 10px 2px rgba(33, 203, 243, .3)',
+                    },
+                    '&:disabled': {
+                      background: 'linear-gradient(45deg, #90CAF9 30%, #BBDEFB 90%)',
+                      transform: 'none',
+                      boxShadow: 'none',
+                    },
+                    transition: 'all 0.3s ease',
+                  }}
+                >
                   {uploading ? 'Saving...' : isEditing ? 'Update Project' : 'Save Project'}
-                </button>
+                </Button>
               </form>
             </div>
           ) : selectedProject ? (
@@ -575,16 +642,48 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
                     {selectedProject.status}
                   </span>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button onClick={() => handleEdit(selectedProject)} className="back-button">
-                    <Edit2 className="w-4 h-4" />
+                <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+                  <Button
+                    variant="contained"
+                    startIcon={<Edit />}
+                    onClick={() => handleEdit(selectedProject)}
+                    sx={{
+                      borderRadius: 2,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      background: 'linear-gradient(45deg, #4CAF50 30%, #66BB6A 90%)',
+                      boxShadow: '0 3px 5px 2px rgba(76, 175, 80, .3)',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #388E3C 30%, #4CAF50 90%)',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 6px 10px 2px rgba(76, 175, 80, .3)',
+                      },
+                      transition: 'all 0.3s ease',
+                    }}
+                  >
                     Edit
-                  </button>
-                  <button onClick={() => handleDelete(selectedProject.id)} className="back-button" style={{ backgroundColor: '#dc3545' }}>
-                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<Delete />}
+                    onClick={() => handleDelete(selectedProject.id)}
+                    sx={{
+                      borderRadius: 2,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      background: 'linear-gradient(45deg, #f44336 30%, #e57373 90%)',
+                      boxShadow: '0 3px 5px 2px rgba(244, 67, 54, .3)',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #d32f2f 30%, #f44336 90%)',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 6px 10px 2px rgba(244, 67, 54, .3)',
+                      },
+                      transition: 'all 0.3s ease',
+                    }}
+                  >
                     Delete
-                  </button>
-                </div>
+                  </Button>
+                </Box>
               </div>
 
               <div className="details-grid">
@@ -707,7 +806,7 @@ export default function WoodworkingProjects({ onNavigateBack }: WoodworkingProje
             </div>
           ) : (
             <div className="no-selection">
-              <Hammer size={64} />
+              <BuildIcon sx={{ fontSize: 64, color: 'text.disabled' }} />
               <p>Select a project or create a new one!</p>
             </div>
           )}

@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Shuffle, ArrowLeft, Film } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
+import { Box, Typography, Chip, Button } from '@mui/material'
+import { Movie as MovieIcon, Shuffle } from '@mui/icons-material'
 import './App.css'
 
 interface PlexMedia {
@@ -70,11 +72,7 @@ interface PlexResponse {
   }
 }
 
-interface HalloweenMovieSelectorProps {
-  onNavigateBack: () => void
-}
-
-export default function HalloweenMovieSelector({ onNavigateBack }: HalloweenMovieSelectorProps) {
+export default function HalloweenMovieSelector() {
   const [movies, setMovies] = useState<PlexMovie[]>([])
   const [selectedMovie, setSelectedMovie] = useState<PlexMovie | null>(null)
   const [loading, setLoading] = useState(true)
@@ -157,24 +155,23 @@ export default function HalloweenMovieSelector({ onNavigateBack }: HalloweenMovi
   return (
     <div className="shop-tools-container">
       {/* Header */}
-      <div className="shop-header">
-        <button
-          onClick={onNavigateBack}
-          className="back-button"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Chat
-        </button>
-        
-        <div className="header-title">
-          <Film className="w-6 h-6" />
-          <h1>Halloween Movie Selector</h1>
-        </div>
-        
-        <div className="tools-count">
-          {filteredMovies.length} movies
-        </div>
-      </div>
+      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <MovieIcon color="primary" />
+            <Typography variant="h5" component="h1" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+              Halloween Movie Selector
+            </Typography>
+          </Box>
+          <Chip
+            icon={<MovieIcon />}
+            label={loading ? 'Loading...' : `${filteredMovies.length} movies`}
+            color="primary"
+            variant="outlined"
+            size="small"
+          />
+        </Box>
+      </Box>
 
       {loading && (
         <div className="loading-container">
@@ -198,13 +195,30 @@ export default function HalloweenMovieSelector({ onNavigateBack }: HalloweenMovi
           {/* Left Side - Movie List */}
           <div className="tools-list-panel">
             <div className="search-section">
-              <button
+              <Button
+                variant="contained"
+                startIcon={<Shuffle />}
                 onClick={pickRandomMovie}
-                className="random-button"
+                fullWidth
+                size="large"
+                sx={{
+                  borderRadius: 2,
+                  py: 1.5,
+                  textTransform: 'none',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  background: 'linear-gradient(45deg, #9C27B0 30%, #E91E63 90%)',
+                  boxShadow: '0 3px 5px 2px rgba(156, 39, 176, .3)',
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #7B1FA2 30%, #C2185B 90%)',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 6px 10px 2px rgba(156, 39, 176, .3)',
+                  },
+                  transition: 'all 0.3s ease',
+                }}
               >
-                <Shuffle className="w-4 h-4" />
                 Pick Random Movie
-              </button>
+              </Button>
             </div>
 
             <div className="search-section" style={{ paddingTop: '0.5rem' }}>
@@ -386,7 +400,7 @@ export default function HalloweenMovieSelector({ onNavigateBack }: HalloweenMovi
               </div>
             ) : (
               <div className="no-selection">
-                <Film size={64} />
+                <MovieIcon sx={{ fontSize: 64, color: 'text.disabled' }} />
                 <p>Select a movie or pick a random one!</p>
               </div>
             )}
