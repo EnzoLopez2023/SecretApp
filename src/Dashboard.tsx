@@ -18,6 +18,7 @@ import {
 } from '@mui/icons-material';
 import { useMsal } from '@azure/msal-react';
 import NavigationSidebar from './NavigationSidebar';
+import VersionDisplay from './components/VersionDisplay';
 
 type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter';
 
@@ -66,9 +67,12 @@ export default function Dashboard({ currentView, onNavigate }: DashboardProps) {
             <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 600 }}>
               Dashboard
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Welcome, {userName}!
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <VersionDisplay variant="chip" size="small" />
+              <Typography variant="body2" color="text.secondary">
+                Welcome, {userName}!
+              </Typography>
+            </Box>
           </Toolbar>
         </AppBar>
 
@@ -89,6 +93,9 @@ export default function Dashboard({ currentView, onNavigate }: DashboardProps) {
                   <Typography variant="body1" sx={{ mt: 1, opacity: 0.8 }}>
                     Congratulations! You have successfully logged in to the Secret App using
                   </Typography>
+                  <Box sx={{ mt: 2, opacity: 0.7 }}>
+                    <VersionDisplay variant="text" size="medium" />
+                  </Box>
                 </Box>
               </Box>
             </CardContent>

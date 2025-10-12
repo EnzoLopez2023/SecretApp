@@ -5,6 +5,10 @@ Write-Host "Starting SecretApp deployment" -ForegroundColor Cyan
 # Change to project directory
 Set-Location -Path "C:\Source\Repo\SecretApp"
 
+# Increment version
+Write-Host "Incrementing build version..." -ForegroundColor Yellow
+.\increment-version.ps1 -Type build
+
 # Build full deployment package
 Write-Host "Building application (npm run build:full)" -ForegroundColor Yellow
 npm run build:full
@@ -21,6 +25,10 @@ Stop-Service -Name W3SVC -Force
 # Deploy dist contents to IIS site folder
 Write-Host "Copying build artifacts to IIS site" -ForegroundColor Yellow
 xcopy /E /Y "C:\Source\Repo\SecretApp\dist\*" "C:\inetpub\wwwroot\secretapp\" | Out-Null
+
+# Copy version.json to site for runtime access
+Write-Host "Copying version info..." -ForegroundColor Yellow
+xcopy /Y "C:\Source\Repo\SecretApp\version.json" "C:\inetpub\wwwroot\secretapp\" | Out-Null
 
 # Install backend dependencies if needed
 Write-Host "Checking backend dependencies..." -ForegroundColor Yellow
@@ -90,4 +98,10 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "Inventory endpoint failed" -ForegroundColor Red
 }
 
+# Display deployed version
+$versionInfo = Get-Content "version.json" | ConvertFrom-Json
+$fullVersion = "$($versionInfo.version).$($versionInfo.build)"
+
 Write-Host "Deployment script complete" -ForegroundColor Cyan
+Write-Host "Deployed version: $fullVersion" -ForegroundColor Green
+Write-Host "Build timestamp: $($versionInfo.timestamp)" -ForegroundColor Green
