@@ -5,7 +5,7 @@ import NavigationSidebar from './NavigationSidebar'
 import ChatApp from './ChatApp'
 import ExcelToJsonConverter from './ExcelToJsonConverter'
 import MyShopTools from './MyShopTools'
-import HalloweenMovieSelector from './HalloweenMovieSelector'
+import PlexMovieInsights from './PlexMovieInsights'
 import WoodworkingProjects from './WoodworkingProjects'
 import './App.css'
 
@@ -41,7 +41,7 @@ export default function App() {
               <MyShopTools />
             )}
             {currentView === 'halloween' && (
-              <HalloweenMovieSelector />
+              <PlexMovieInsights />
             )}
             {currentView === 'woodworking' && (
               <WoodworkingProjects />

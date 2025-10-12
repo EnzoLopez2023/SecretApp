@@ -50,7 +50,7 @@ export default function NavigationSidebar({ currentView, onNavigate, showOnDashb
     { id: 'chat', label: 'Test Chat App', icon: <ChatIcon />, color: '#4CAF50' },
     { id: 'shop', label: 'My Shop Tools', icon: <StoreIcon />, color: '#6366f1' },
     { id: 'woodworking', label: 'Woodworking Projects', icon: <CarpenterIcon />, color: '#f59e0b' },
-    { id: 'halloween', label: 'Halloween Movies', icon: <MovieIcon />, color: '#ff9800' },
+    { id: 'halloween', label: 'Plex Insights', icon: <MovieIcon />, color: '#ff9800' },
     { id: 'converter', label: 'Excel to JSON Converter', icon: <ConverterIcon />, color: '#9c27b0' },
   ];
 
