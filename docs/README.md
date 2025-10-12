@@ -1,11 +1,42 @@
-# React + TypeScript + Vite
+# Workshop Studio 🛠️
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Your Personal Productivity & Maker's Hub**
 
-Currently, two official plugins are available:
+Workshop Studio is a comprehensive productivity and hobby management application that combines modern AI assistance with practical tools for makers, hobbyists, and professionals.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🚀 Features
+
+### 🤖 AI Assistant
+- Modern conversational AI interface built with Material-UI
+- Context-aware responses for shop tools, media library, and general questions
+- Beautiful chat interface with message bubbles and typing indicators
+
+### 🔧 Shop Tools Manager
+- Complete inventory management for workshop tools
+- Spending analysis and company breakdown
+- Search and categorization capabilities
+
+### 📽️ Media Library (Plex Integration)
+- Movie and TV show insights
+- Library statistics and recommendations
+- Entertainment management tools
+
+### 🪵 Project Workshop
+- Woodworking project management
+- Project tracking and documentation
+- Material and tool requirements
+
+### 📊 Data Converter
+- Excel to JSON conversion utility
+- Data transformation tools
+- Import/export capabilities
+
+## 🛠️ Tech Stack
+
+- **Frontend**: React + TypeScript + Vite
+- **UI Framework**: Material-UI (MUI) v7.3.4 with Material Design 3
+- **Authentication**: Microsoft Authentication Library (MSAL)
+- **Styling**: Modern Material Design with Inter font
 
 ## React Compiler
 

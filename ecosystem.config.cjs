@@ -1,6 +1,6 @@
 module.exports = {
   apps: [{
-    name: 'secretapp-backend',
+    name: 'workshop-studio-backend',
     script: './server.js',
     instances: 1,
     autorestart: true,

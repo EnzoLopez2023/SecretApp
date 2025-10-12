@@ -47,11 +47,11 @@ export default function NavigationSidebar({ currentView, onNavigate, showOnDashb
 
   const menuItems = [
     { id: 'dashboard', label: 'Home', icon: <HomeIcon />, color: '#2196F3' },
-    { id: 'chat', label: 'Test Chat App', icon: <ChatIcon />, color: '#4CAF50' },
-    { id: 'shop', label: 'My Shop Tools', icon: <StoreIcon />, color: '#6366f1' },
-    { id: 'woodworking', label: 'Woodworking Projects', icon: <CarpenterIcon />, color: '#f59e0b' },
-    { id: 'halloween', label: 'Plex Insights', icon: <MovieIcon />, color: '#ff9800' },
-    { id: 'converter', label: 'Excel to JSON Converter', icon: <ConverterIcon />, color: '#9c27b0' },
+    { id: 'chat', label: 'AI Assistant', icon: <ChatIcon />, color: '#4CAF50' },
+    { id: 'shop', label: 'Shop Tools Manager', icon: <StoreIcon />, color: '#6366f1' },
+    { id: 'woodworking', label: 'Project Workshop', icon: <CarpenterIcon />, color: '#f59e0b' },
+    { id: 'halloween', label: 'Media Library', icon: <MovieIcon />, color: '#ff9800' },
+    { id: 'converter', label: 'Data Converter', icon: <ConverterIcon />, color: '#9c27b0' },
   ];
 
   // Don't show sidebar on dashboard unless explicitly requested
@@ -86,7 +86,7 @@ export default function NavigationSidebar({ currentView, onNavigate, showOnDashb
           color="primary"
           sx={{ fontSize: { xs: '1.25rem', md: '1.5rem' } }}
         >
-          Secret App
+          Workshop Studio
         </Typography>
       </Box>
 

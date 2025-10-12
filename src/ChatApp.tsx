@@ -1,7 +1,32 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import {
+  Box,
+  Paper,
+  TextField,
+  Typography,
+  Chip,
+  AppBar,
+  Toolbar,
+  Container,
+  Stack,
+  Avatar,
+  Fade,
+  Grow,
+  useTheme,
+  alpha,
+  Tooltip,
+  Fab,
+  IconButton
+} from '@mui/material'
+import {
+  Send as SendIcon,
+  Person as PersonIcon,
+  SmartToy as BotIcon,
+  Clear as ClearIcon,
+  AutoAwesome as SparkleIcon
+} from '@mui/icons-material'
 import shopData from './assets/MyShop.json'
 import { isPlexQuestion, generatePlexContext } from './ChatAgent/PlexAgent'
-import './App.css'
 
 // Define the type for inventory items
 interface InventoryItem {
@@ -201,11 +226,19 @@ const generateShopContext = (question: string): string => {
   return context
 }
 
+// Interface for conversation messages
+interface ConversationMessage {
+  id: string;
+  type: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+}
+
 export default function ChatApp() {
   const [question, setQuestion] = useState('')
-  const [response, setResponse] = useState('')
   const [loading, setLoading] = useState(false)
-  const [questionHistory, setQuestionHistory] = useState<string[]>([])
+  const [conversation, setConversation] = useState<ConversationMessage[]>([])
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Debug: Check if Azure OpenAI credentials are loaded
   console.log('Azure endpoint loaded:', !!import.meta.env.VITE_AZURE_OPENAI_ENDPOINT)
@@ -215,6 +248,11 @@ export default function ChatApp() {
   // Debug: Log button state
   const isButtonDisabled = loading || !question.trim()
   console.log('Button disabled:', isButtonDisabled, 'Loading:', loading, 'Question length:', question.length, 'Question trimmed:', question.trim().length)
+
+  // Auto-scroll to bottom when new messages are added
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [conversation, loading])
 
   const handleSubmit = async (e: React.FormEvent) => {
     console.log('Form submitted, question:', question)
@@ -228,9 +266,20 @@ export default function ChatApp() {
 
     const currentQuestion = question.trim()
     
+    // Add user message to conversation
+    const userMessage: ConversationMessage = {
+      id: `user-${Date.now()}`,
+      type: 'user',
+      content: currentQuestion,
+      timestamp: new Date()
+    }
+    
+    setConversation(prev => [...prev, userMessage])
+    setQuestion('')
+    setLoading(true)
+    
     // Check if this is a shop-related or Plex-related question and enhance with context
     let enhancedQuestion = currentQuestion
-    setLoading(true)
     
     try {
       // Get API base URL
@@ -253,7 +302,23 @@ export default function ChatApp() {
       // Continue with original question if context generation fails
       enhancedQuestion = currentQuestion
     }
+    
     try {
+      // Build conversation history for context
+      const conversationHistory = conversation.map(msg => ({
+        role: msg.type === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      }))
+      
+      // Add the current enhanced question
+      const messages = [
+        ...conversationHistory,
+        {
+          role: 'user' as const,
+          content: enhancedQuestion
+        }
+      ]
+
       const response = await fetch(import.meta.env.VITE_AZURE_OPENAI_ENDPOINT, {
         method: 'POST',
         headers: {
@@ -261,12 +326,7 @@ export default function ChatApp() {
           'api-key': import.meta.env.VITE_AZURE_OPENAI_API_KEY
         },
         body: JSON.stringify({
-          messages: [
-            {
-              role: 'user',
-              content: enhancedQuestion
-            }
-          ],
+          messages: messages,
           max_tokens: 1500,
           temperature: 0.7
         })
@@ -279,10 +339,15 @@ export default function ChatApp() {
       const data = await response.json()
       const aiResponse = data.choices?.[0]?.message?.content || 'No response received'
       
-      // Add question to history and clear input
-      setQuestionHistory(prev => [...prev, currentQuestion])
-      setQuestion('')
-      setResponse(aiResponse)
+      // Add AI response to conversation
+      const assistantMessage: ConversationMessage = {
+        id: `assistant-${Date.now()}`,
+        type: 'assistant',
+        content: aiResponse,
+        timestamp: new Date()
+      }
+      
+      setConversation(prev => [...prev, assistantMessage])
     } catch (error) {
       console.error('Error:', error)
       let errorMessage = 'Sorry, there was an error processing your request.'
@@ -301,65 +366,424 @@ export default function ChatApp() {
         }
       }
       
-      setResponse(errorMessage)
+      // Add error message to conversation
+      const errorMessageObj: ConversationMessage = {
+        id: `error-${Date.now()}`,
+        type: 'assistant',
+        content: errorMessage,
+        timestamp: new Date()
+      }
+      
+      setConversation(prev => [...prev, errorMessageObj])
     } finally {
       setLoading(false)
     }
   }
 
+  const theme = useTheme()
+  const [showScrollButton, setShowScrollButton] = useState(false)
+  const conversationRef = useRef<HTMLDivElement>(null)
+
+  // Handle scroll detection for scroll-to-bottom button
+  useEffect(() => {
+    const handleScroll = () => {
+      if (conversationRef.current) {
+        const { scrollTop, scrollHeight, clientHeight } = conversationRef.current
+        const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
+        setShowScrollButton(conversation.length > 3 && !isNearBottom)
+      }
+    }
+
+    const element = conversationRef.current
+    if (element) {
+      element.addEventListener('scroll', handleScroll)
+      return () => element.removeEventListener('scroll', handleScroll)
+    }
+  }, [conversation.length])
+
   return (
-    <div className="app">
-      <div className="app-content">
-        <div className="left-panel">
-          <h2>Ask a Question</h2>
+    <Box sx={{ 
+      height: '100vh', 
+      display: 'flex', 
+      flexDirection: 'column',
+      bgcolor: theme.palette.background.default
+    }}>
+      {/* Header */}
+      <AppBar 
+        position="static" 
+        elevation={0}
+        sx={{ 
+          bgcolor: theme.palette.background.paper,
+          borderBottom: `1px solid ${theme.palette.divider}`
+        }}
+      >
+        <Toolbar sx={{ justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Avatar sx={{ 
+              bgcolor: theme.palette.primary.main,
+              width: 32,
+              height: 32
+            }}>
+              <BotIcon />
+            </Avatar>
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                color: theme.palette.text.primary,
+                fontWeight: 600
+              }}
+            >
+              Workshop Studio AI
+            </Typography>
+          </Box>
           
-          {/* Question History */}
-          <div className="question-history">
-            <h3>Previous Questions</h3>
-            <div className="history-list">
-              {questionHistory.length === 0 ? (
-                <div className="history-placeholder">No previous questions yet...</div>
-              ) : (
-                questionHistory.map((q, index) => (
-                  <div key={index} className="history-item">
-                    {index + 1}. {q}
-                  </div>
-                ))
+          {conversation.length > 0 && (
+            <Tooltip title="Clear conversation">
+              <IconButton 
+                onClick={() => setConversation([])}
+                size="small"
+                sx={{ 
+                  bgcolor: alpha(theme.palette.error.main, 0.1),
+                  '&:hover': {
+                    bgcolor: alpha(theme.palette.error.main, 0.2)
+                  }
+                }}
+              >
+                <ClearIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Toolbar>
+      </AppBar>
+
+      {/* Messages Container */}
+      <Box 
+        ref={conversationRef}
+        sx={{ 
+          flex: 1, 
+          overflow: 'auto',
+          bgcolor: alpha(theme.palette.background.default, 0.3),
+          position: 'relative'
+        }}
+      >
+        <Container 
+          maxWidth="md" 
+          sx={{ 
+            py: 2,
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+        >
+          {conversation.length === 0 ? (
+            <Fade in timeout={800}>
+              <Box sx={{ 
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                textAlign: 'center',
+                gap: 3
+              }}>
+                <Avatar sx={{ 
+                  width: 80, 
+                  height: 80,
+                  bgcolor: theme.palette.primary.main,
+                  mb: 2
+                }}>
+                  <SparkleIcon sx={{ fontSize: 40 }} />
+                </Avatar>
+                
+                <Typography 
+                  variant="h4" 
+                  sx={{ 
+                    fontWeight: 700,
+                    background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent'
+                  }}
+                >
+                  Welcome to Workshop Studio
+                </Typography>
+                
+                <Typography 
+                  variant="h6" 
+                  color="text.secondary"
+                  sx={{ maxWidth: 600, lineHeight: 1.6 }}
+                >
+                  Your intelligent assistant for managing projects, tools, entertainment, and more. 
+                  Ask me about your shop inventory, Plex library, or any general questions.
+                </Typography>
+
+                <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+                  <Chip 
+                    label="🔧 Shop Tools" 
+                    variant="outlined" 
+                    sx={{ 
+                      borderColor: theme.palette.primary.main,
+                      color: theme.palette.primary.main,
+                      '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1) }
+                    }}
+                  />
+                  <Chip 
+                    label="🎬 Plex Movies" 
+                    variant="outlined"
+                    sx={{ 
+                      borderColor: theme.palette.secondary.main,
+                      color: theme.palette.secondary.main,
+                      '&:hover': { bgcolor: alpha(theme.palette.secondary.main, 0.1) }
+                    }}
+                  />
+                  <Chip 
+                    label="💡 General Q&A" 
+                    variant="outlined"
+                    sx={{ 
+                      borderColor: theme.palette.success.main,
+                      color: theme.palette.success.main,
+                      '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.1) }
+                    }}
+                  />
+                </Stack>
+              </Box>
+            </Fade>
+          ) : (
+            <Stack spacing={3} sx={{ pb: 2 }}>
+              {conversation.map((message, index) => (
+                <Grow 
+                  key={message.id} 
+                  in 
+                  timeout={300 + index * 100}
+                >
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: message.type === 'user' ? 'flex-end' : 'flex-start',
+                    alignItems: 'flex-start',
+                    gap: 1.5
+                  }}>
+                    {message.type === 'assistant' && (
+                      <Avatar sx={{ 
+                        bgcolor: theme.palette.primary.main,
+                        width: 32,
+                        height: 32,
+                        mt: 0.5
+                      }}>
+                        <BotIcon fontSize="small" />
+                      </Avatar>
+                    )}
+                    
+                    <Paper
+                      elevation={message.type === 'user' ? 2 : 1}
+                      sx={{
+                        maxWidth: '75%',
+                        p: 2,
+                        bgcolor: message.type === 'user' 
+                          ? theme.palette.primary.main 
+                          : theme.palette.background.paper,
+                        color: message.type === 'user' 
+                          ? theme.palette.primary.contrastText 
+                          : theme.palette.text.primary,
+                        borderRadius: message.type === 'user' 
+                          ? '18px 18px 4px 18px' 
+                          : '18px 18px 18px 4px',
+                        border: message.type === 'assistant' 
+                          ? `1px solid ${theme.palette.divider}`
+                          : 'none'
+                      }}
+                    >
+                      <Typography 
+                        variant="body1" 
+                        sx={{ 
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          lineHeight: 1.6
+                        }}
+                      >
+                        {message.content}
+                      </Typography>
+                      
+                      <Typography 
+                        variant="caption" 
+                        sx={{ 
+                          display: 'block',
+                          mt: 1,
+                          opacity: 0.7,
+                          textAlign: message.type === 'user' ? 'right' : 'left'
+                        }}
+                      >
+                        {message.timestamp.toLocaleTimeString()}
+                      </Typography>
+                    </Paper>
+
+                    {message.type === 'user' && (
+                      <Avatar sx={{ 
+                        bgcolor: theme.palette.secondary.main,
+                        width: 32,
+                        height: 32,
+                        mt: 0.5
+                      }}>
+                        <PersonIcon fontSize="small" />
+                      </Avatar>
+                    )}
+                  </Box>
+                </Grow>
+              ))}
+              
+              {loading && (
+                <Fade in>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'flex-start',
+                    alignItems: 'flex-start',
+                    gap: 1.5
+                  }}>
+                    <Avatar sx={{ 
+                      bgcolor: theme.palette.primary.main,
+                      width: 32,
+                      height: 32,
+                      mt: 0.5
+                    }}>
+                      <BotIcon fontSize="small" />
+                    </Avatar>
+                    
+                    <Paper
+                      elevation={1}
+                      sx={{
+                        p: 2,
+                        bgcolor: theme.palette.background.paper,
+                        borderRadius: '18px 18px 18px 4px',
+                        border: `1px solid ${theme.palette.divider}`
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                        {[0, 1, 2].map((i) => (
+                          <Box
+                            key={i}
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              bgcolor: theme.palette.primary.main,
+                              animation: 'pulse 1.4s ease-in-out infinite',
+                              animationDelay: `${i * 0.2}s`,
+                              '@keyframes pulse': {
+                                '0%, 80%, 100%': {
+                                  opacity: 0.3,
+                                  transform: 'scale(0.8)'
+                                },
+                                '40%': {
+                                  opacity: 1,
+                                  transform: 'scale(1)'
+                                }
+                              }
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    </Paper>
+                  </Box>
+                </Fade>
               )}
-            </div>
-          </div>
-          
-          <form onSubmit={handleSubmit} className="question-form">
-            <textarea
+            </Stack>
+          )}
+          <div ref={messagesEndRef} />
+        </Container>
+        
+        {/* Floating Scroll to Bottom Button */}
+        {showScrollButton && (
+          <Fade in>
+            <Fab
+              size="small"
+              onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })}
+              sx={{
+                position: 'absolute',
+                bottom: 20,
+                right: 20,
+                bgcolor: theme.palette.background.paper,
+                color: theme.palette.text.secondary,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                '&:hover': {
+                  bgcolor: theme.palette.background.paper,
+                  transform: 'scale(1.1)',
+                },
+              }}
+            >
+              ↓
+            </Fab>
+          </Fade>
+        )}
+      </Box>
+
+      {/* Input Area */}
+      <Paper 
+        elevation={8}
+        sx={{ 
+          p: 2,
+          borderTop: `1px solid ${theme.palette.divider}`,
+          bgcolor: theme.palette.background.paper
+        }}
+      >
+        <Container maxWidth="md">
+          <Box 
+            component="form" 
+            onSubmit={handleSubmit}
+            sx={{ 
+              display: 'flex', 
+              gap: 1,
+              alignItems: 'flex-end'
+            }}
+          >
+            <TextField
+              multiline
+              maxRows={6}
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Type your question here..."
-              className="question-input"
-              rows={3}
+              placeholder="Type your message here..."
+              variant="outlined"
+              fullWidth
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSubmit(e)
+                }
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '24px',
+                  bgcolor: alpha(theme.palette.background.default, 0.5),
+                  '&:hover fieldset': {
+                    borderColor: theme.palette.primary.main,
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: theme.palette.primary.main,
+                  }
+                }
+              }}
             />
-            <button 
-              type="submit" 
+            
+            <Fab
+              type="submit"
               disabled={isButtonDisabled}
-              className="submit-button"
+              size="medium"
+              color="primary"
+              sx={{ 
+                minWidth: 48,
+                minHeight: 48,
+                transition: 'all 0.2s',
+                '&:hover': {
+                  transform: 'scale(1.05)'
+                },
+                '&:active': {
+                  transform: 'scale(0.95)'
+                }
+              }}
             >
-              {loading ? 'Thinking...' : 'Submit'}
-            </button>
-          </form>
-        </div>
-        
-        <div className="right-panel">
-          <h2>Response</h2>
-          <div className="response-area">
-            {loading ? (
-              <div className="loading">Processing your question...</div>
-            ) : response ? (
-              <div className="response-text">{response}</div>
-            ) : (
-              <div className="placeholder">Your answer will appear here...</div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+              <SendIcon />
+            </Fab>
+          </Box>
+        </Container>
+      </Paper>
+    </Box>
   )
 }

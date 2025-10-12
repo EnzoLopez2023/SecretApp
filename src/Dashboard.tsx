@@ -35,11 +35,11 @@ export default function Dashboard({ currentView, onNavigate }: DashboardProps) {
   const userEmail = account?.username || '';
 
   const menuItems = [
-    { id: 'chat', label: 'Test Chat App', icon: <ChatIcon />, color: '#4CAF50' },
-    { id: 'shop', label: 'My Shop Tools', icon: <StoreIcon />, color: '#6366f1' },
-    { id: 'woodworking', label: 'Woodworking Projects', icon: <CarpenterIcon />, color: '#f59e0b' },
-    { id: 'halloween', label: 'Plex Insights', icon: <MovieIcon />, color: '#ff9800' },
-    { id: 'converter', label: 'Excel to JSON Converter', icon: <ConverterIcon />, color: '#9c27b0' },
+    { id: 'chat', label: 'AI Assistant', icon: <ChatIcon />, color: '#4CAF50' },
+    { id: 'shop', label: 'Shop Tools Manager', icon: <StoreIcon />, color: '#6366f1' },
+    { id: 'woodworking', label: 'Project Workshop', icon: <CarpenterIcon />, color: '#f59e0b' },
+    { id: 'halloween', label: 'Media Library', icon: <MovieIcon />, color: '#ff9800' },
+    { id: 'converter', label: 'Data Converter', icon: <ConverterIcon />, color: '#9c27b0' },
   ];
 
   if (currentView !== 'dashboard') {
@@ -65,7 +65,7 @@ export default function Dashboard({ currentView, onNavigate }: DashboardProps) {
         >
           <Toolbar>
             <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 600 }}>
-              Dashboard
+              Workshop Studio
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <VersionDisplay variant="chip" size="small" />
@@ -85,13 +85,13 @@ export default function Dashboard({ currentView, onNavigate }: DashboardProps) {
                 <AccountIcon sx={{ fontSize: 48, mr: 2 }} />
                 <Box>
                   <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
-                    Hello World
+                    Welcome to Workshop Studio
                   </Typography>
                   <Typography variant="h6" sx={{ opacity: 0.9 }}>
-                    🏠 Welcome to application!
+                    🛠️ Your Personal Productivity & Maker's Hub
                   </Typography>
                   <Typography variant="body1" sx={{ mt: 1, opacity: 0.8 }}>
-                    Congratulations! You have successfully logged in to the Secret App using
+                    Manage your projects, tools, media library, and more - all in one place.
                   </Typography>
                   <Box sx={{ mt: 2, opacity: 0.7 }}>
                     <VersionDisplay variant="text" size="medium" />
