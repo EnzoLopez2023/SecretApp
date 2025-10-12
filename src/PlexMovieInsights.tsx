@@ -138,12 +138,20 @@ export default function PlexMovieInsights() {
       }
       
       const data: PlexSectionsResponse = await response.json()
-      const libraryList = data.MediaContainer.Directory || []
-      setLibraries(libraryList)
+      const allLibraries = data.MediaContainer.Directory || []
       
-      // Auto-select the first library
-      if (libraryList.length > 0) {
-        setSelectedLibrary(libraryList[0].key)
+      // Filter to only show Movie libraries (exclude TV shows, music, etc.)
+      const movieLibraries = allLibraries.filter(library => 
+        library.type.toLowerCase() === 'movie'
+      )
+      
+      console.log(`Found ${allLibraries.length} total libraries, ${movieLibraries.length} movie libraries`)
+      
+      setLibraries(movieLibraries)
+      
+      // Auto-select the first movie library
+      if (movieLibraries.length > 0) {
+        setSelectedLibrary(movieLibraries[0].key)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch libraries')
@@ -296,6 +304,7 @@ export default function PlexMovieInsights() {
                       value={selectedLibrary}
                       label="Select Library"
                       onChange={(e) => setSelectedLibrary(e.target.value as string)}
+                      disabled={libraries.length === 0}
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           borderRadius: 2,
@@ -309,19 +318,28 @@ export default function PlexMovieInsights() {
                         },
                       }}
                     >
-                      {libraries.map((library) => (
-                        <MenuItem key={library.key} value={library.key}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                            <VideoLibrary fontSize="small" />
-                            <Typography sx={{ flex: 1 }}>{library.title}</Typography>
-                            <Chip 
-                              label={library.type} 
-                              size="small" 
-                              variant="outlined"
-                            />
-                          </Box>
+                      {libraries.length === 0 ? (
+                        <MenuItem disabled>
+                          <Typography color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                            No movie libraries found
+                          </Typography>
                         </MenuItem>
-                      ))}
+                      ) : (
+                        libraries.map((library) => (
+                          <MenuItem key={library.key} value={library.key}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                              <VideoLibrary fontSize="small" />
+                              <Typography sx={{ flex: 1 }}>{library.title}</Typography>
+                              <Chip 
+                                label="Movie" 
+                                size="small" 
+                                variant="outlined"
+                                color="primary"
+                              />
+                            </Box>
+                          </MenuItem>
+                        ))
+                      )}
                     </Select>
                   </FormControl>
                   
