@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { ArrowLeft } from 'lucide-react'
-import { Box, Typography, Chip, Button } from '@mui/material'
-import { Movie as MovieIcon, Shuffle } from '@mui/icons-material'
+import { Box, Typography, Chip, Button, TextField, InputAdornment } from '@mui/material'
+import { Movie as MovieIcon, Shuffle, Search } from '@mui/icons-material'
 import './App.css'
 
 interface PlexMedia {
@@ -155,11 +155,26 @@ export default function HalloweenMovieSelector() {
   return (
     <div className="shop-tools-container">
       {/* Header */}
-      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+      <Box sx={{ p: { xs: 1, sm: 2 }, borderBottom: 1, borderColor: 'divider' }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          mb: { xs: 1, sm: 2 },
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: { xs: 1, sm: 0 }
+        }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <MovieIcon color="primary" />
-            <Typography variant="h5" component="h1" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+            <Typography 
+              variant="h5" 
+              component="h1" 
+              sx={{ 
+                fontWeight: 'bold', 
+                color: 'text.primary',
+                fontSize: { xs: '1.25rem', sm: '1.5rem' }
+              }}
+            >
               Halloween Movie Selector
             </Typography>
           </Box>
@@ -203,12 +218,13 @@ export default function HalloweenMovieSelector() {
                 size="large"
                 sx={{
                   borderRadius: 2,
-                  py: 1.5,
+                  py: { xs: 1.25, sm: 1.5 },
                   textTransform: 'none',
-                  fontSize: '1rem',
+                  fontSize: { xs: '0.9rem', sm: '1rem' },
                   fontWeight: 600,
                   background: 'linear-gradient(45deg, #9C27B0 30%, #E91E63 90%)',
                   boxShadow: '0 3px 5px 2px rgba(156, 39, 176, .3)',
+                  minHeight: { xs: '48px', sm: '56px' }, // Touch-friendly height
                   '&:hover': {
                     background: 'linear-gradient(45deg, #7B1FA2 30%, #C2185B 90%)',
                     transform: 'translateY(-1px)',
@@ -222,12 +238,32 @@ export default function HalloweenMovieSelector() {
             </div>
 
             <div className="search-section" style={{ paddingTop: '0.5rem' }}>
-              <input
-                type="text"
-                className="search-input"
+              <TextField
+                fullWidth
                 placeholder="Search movies..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search color="action" />
+                    </InputAdornment>
+                  ),
+                }}
+                variant="outlined"
+                size="medium"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    backgroundColor: 'background.default',
+                    '&:hover': {
+                      backgroundColor: 'action.hover',
+                    },
+                    '&.Mui-focused': {
+                      backgroundColor: 'background.paper',
+                    },
+                  },
+                }}
               />
             </div>
 

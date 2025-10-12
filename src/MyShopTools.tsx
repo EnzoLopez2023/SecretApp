@@ -373,7 +373,7 @@ export default function MyShopTools() {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 2 }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 1, sm: 2 }, px: { xs: 1, sm: 3 } }}>
 
       {/* Error Alert */}
       <Snackbar
@@ -387,16 +387,37 @@ export default function MyShopTools() {
         </Alert>
       </Snackbar>
 
-      <Box sx={{ display: 'flex', gap: 3, height: 'calc(100vh - 200px)' }}>
+      <Box sx={{ 
+        display: 'flex', 
+        gap: { xs: 1, sm: 3 }, 
+        height: { xs: 'calc(100vh - 100px)', sm: 'calc(100vh - 200px)' },
+        flexDirection: { xs: 'column', md: 'row' }
+      }}>
         {/* Left Panel - Tool List */}
-        <Box sx={{ width: { xs: '100%', md: '400px' }, flexShrink: 0, display: { xs: showMobileDetails ? 'none' : 'block', md: 'block' } }}>
-          <Paper sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ 
+          width: { xs: '100%', md: '400px' }, 
+          flexShrink: 0, 
+          display: { xs: showMobileDetails ? 'none' : 'block', md: 'block' },
+          height: { xs: '100%', md: 'auto' }
+        }}>
+          <Paper sx={{ p: { xs: 2, sm: 3 }, height: '100%', display: 'flex', flexDirection: 'column' }}>
             {/* Header with Count */}
-            <Box sx={{ mb: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Box sx={{ mb: { xs: 2, sm: 3 } }}>
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                mb: { xs: 1, sm: 2 },
+                flexDirection: { xs: 'column', sm: 'row' },
+                gap: { xs: 1, sm: 0 }
+              }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Inventory color="primary" />
-                  <Typography variant="h6" fontWeight={600}>
+                  <Typography 
+                    variant="h6" 
+                    fontWeight={600}
+                    sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
+                  >
                     My Shop Tools
                   </Typography>
                 </Box>
@@ -448,12 +469,13 @@ export default function MyShopTools() {
                 size="large"
                 sx={{
                   borderRadius: 2,
-                  py: 1.5,
+                  py: { xs: 1.25, sm: 1.5 },
                   textTransform: 'none',
-                  fontSize: '1rem',
+                  fontSize: { xs: '0.9rem', sm: '1rem' },
                   fontWeight: 600,
                   background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
                   boxShadow: '0 3px 5px 2px rgba(33, 203, 243, .3)',
+                  minHeight: { xs: '48px', sm: '56px' }, // Touch-friendly height
                   '&:hover': {
                     background: 'linear-gradient(45deg, #1976D2 30%, #1CB5E0 90%)',
                     transform: 'translateY(-1px)',
@@ -520,8 +542,12 @@ export default function MyShopTools() {
         </Box>
 
         {/* Right Panel - Tool Details or Edit Form */}
-        <Box sx={{ flexGrow: 1, display: { xs: showMobileDetails ? 'block' : 'none', md: 'block' } }}>
-          <Paper sx={{ p: 3, height: '100%', overflow: 'auto' }}>
+        <Box sx={{ 
+          flexGrow: 1, 
+          display: { xs: showMobileDetails ? 'block' : 'none', md: 'block' },
+          height: { xs: '100%', md: 'auto' }
+        }}>
+          <Paper sx={{ p: { xs: 2, sm: 3 }, height: '100%', overflow: 'auto' }}>
             {selectedTool || isAdding ? (
               <Box>
                 {/* Mobile Back Button */}
@@ -536,6 +562,19 @@ export default function MyShopTools() {
                     startIcon={<ArrowBack />}
                     variant="outlined"
                     fullWidth
+                    sx={{
+                      minHeight: '48px', // Touch-friendly height
+                      borderRadius: 2,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      fontSize: '0.9rem',
+                      borderColor: 'primary.main',
+                      color: 'primary.main',
+                      '&:hover': {
+                        backgroundColor: 'primary.50',
+                        borderColor: 'primary.dark',
+                      },
+                    }}
                   >
                     Back to Tool List
                   </Button>
@@ -543,7 +582,7 @@ export default function MyShopTools() {
 
                 {/* Action Buttons */}
                 {!isEditing && !isAdding && (
-                  <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }}>
                     <Button
                       onClick={handleEdit}
                       startIcon={<Edit />}
@@ -553,12 +592,13 @@ export default function MyShopTools() {
                       size="large"
                       sx={{
                         borderRadius: 2,
-                        py: 1.5,
+                        py: { xs: 1.25, sm: 1.5 },
                         textTransform: 'none',
-                        fontSize: '1rem',
+                        fontSize: { xs: '0.9rem', sm: '1rem' },
                         fontWeight: 600,
                         background: 'linear-gradient(45deg, #4CAF50 30%, #8BC34A 90%)',
                         boxShadow: '0 3px 5px 2px rgba(76, 175, 80, .3)',
+                        minHeight: { xs: '48px', sm: '56px' }, // Touch-friendly height
                         '&:hover': {
                           background: 'linear-gradient(45deg, #388E3C 30%, #689F38 90%)',
                           transform: 'translateY(-1px)',
@@ -578,12 +618,13 @@ export default function MyShopTools() {
                       size="large"
                       sx={{
                         borderRadius: 2,
-                        py: 1.5,
+                        py: { xs: 1.25, sm: 1.5 },
                         textTransform: 'none',
-                        fontSize: '1rem',
+                        fontSize: { xs: '0.9rem', sm: '1rem' },
                         fontWeight: 600,
                         background: 'linear-gradient(45deg, #f44336 30%, #ff7961 90%)',
                         boxShadow: '0 3px 5px 2px rgba(244, 67, 54, .3)',
+                        minHeight: { xs: '48px', sm: '56px' }, // Touch-friendly height
                         '&:hover': {
                           background: 'linear-gradient(45deg, #d32f2f 30%, #f57c00 90%)',
                           transform: 'translateY(-1px)',

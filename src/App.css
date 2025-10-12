@@ -1286,16 +1286,90 @@
   }
 }
 
+/* MUI Container mobile optimization */
+@media (max-width: 768px) {
+  .MuiContainer-root {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+}
+
+/* MUI Button mobile touch targets */
+@media (max-width: 768px) {
+  .MuiButton-root {
+    min-height: 44px; /* iOS recommended touch target */
+    touch-action: manipulation; /* Prevent double-tap zoom */
+  }
+  
+  .MuiButton-sizeLarge {
+    min-height: 48px;
+  }
+}
+
+/* MUI Typography mobile scaling */
+@media (max-width: 768px) {
+  .MuiTypography-h5 {
+    font-size: 1.25rem !important;
+  }
+  
+  .MuiTypography-h6 {
+    font-size: 1.1rem !important;
+  }
+}
+
+/* MUI Paper mobile padding */
+@media (max-width: 768px) {
+  .MuiPaper-root {
+    border-radius: 8px !important;
+  }
+}
+
+/* MUI Chip mobile sizing */
+@media (max-width: 768px) {
+  .MuiChip-small {
+    height: 28px;
+    font-size: 0.75rem;
+  }
+}
+
 /* Fix for iOS Safari bottom bar */
 @media (max-width: 768px) {
   .app,
   .shop-tools-container {
     height: 100vh;
     height: -webkit-fill-available;
+    min-height: -webkit-fill-available;
   }
 
   html {
     height: -webkit-fill-available;
+  }
+  
+  body {
+    height: -webkit-fill-available;
+    min-height: -webkit-fill-available;
+  }
+
+  #root {
+    height: -webkit-fill-available;
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* Prevent zoom on form inputs on mobile */
+@media (max-width: 768px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="search"],
+  textarea,
+  select,
+  .MuiInputBase-input {
+    font-size: 16px !important; /* Prevents zoom on iOS */
+    -webkit-appearance: none; /* Remove iOS styling */
+    appearance: none; /* Standard property for compatibility */
+    border-radius: 8px;
   }
 }
 

@@ -63,19 +63,29 @@ export default function NavigationSidebar({ currentView, onNavigate, showOnDashb
     <Drawer
       variant="permanent"
       sx={{
-        width: drawerWidth,
+        width: { xs: '100%', md: drawerWidth },
         flexShrink: 0,
+        display: { xs: 'block', md: 'block' },
         '& .MuiDrawer-paper': {
-          width: drawerWidth,
+          width: { xs: '100%', md: drawerWidth },
           boxSizing: 'border-box',
           backgroundColor: '#f8fafc',
-          borderRight: '1px solid #e2e8f0',
+          borderRight: { xs: 'none', md: '1px solid #e2e8f0' },
+          borderBottom: { xs: '1px solid #e2e8f0', md: 'none' },
+          position: { xs: 'relative', md: 'fixed' },
+          height: { xs: 'auto', md: '100vh' },
         },
       }}
     >
       {/* App Title */}
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Typography variant="h5" component="h1" fontWeight="bold" color="primary">
+      <Box sx={{ p: { xs: 2, md: 3 }, textAlign: 'center' }}>
+        <Typography 
+          variant="h5" 
+          component="h1" 
+          fontWeight="bold" 
+          color="primary"
+          sx={{ fontSize: { xs: '1.25rem', md: '1.5rem' } }}
+        >
           Secret App
         </Typography>
       </Box>
@@ -83,14 +93,16 @@ export default function NavigationSidebar({ currentView, onNavigate, showOnDashb
       <Divider />
 
       {/* Navigation Menu */}
-      <List sx={{ px: 2 }}>
+      <List sx={{ px: { xs: 1, md: 2 }, py: { xs: 1, md: 2 } }}>
         {menuItems.map((item) => (
-          <ListItem key={item.id} disablePadding sx={{ mb: 1 }}>
+          <ListItem key={item.id} disablePadding sx={{ mb: { xs: 0.5, md: 1 } }}>
             <ListItemButton
               onClick={() => onNavigate(item.id as AppView)}
               selected={currentView === item.id}
               sx={{
                 borderRadius: 2,
+                minHeight: { xs: '48px', md: '44px' }, // Touch-friendly on mobile
+                py: { xs: 1.5, md: 1 },
                 '&.Mui-selected': {
                   backgroundColor: `${item.color}15`,
                   '& .MuiListItemIcon-root': {
@@ -105,13 +117,13 @@ export default function NavigationSidebar({ currentView, onNavigate, showOnDashb
                 },
               }}
             >
-              <ListItemIcon sx={{ color: item.color, minWidth: 40 }}>
+              <ListItemIcon sx={{ color: item.color, minWidth: { xs: 36, md: 40 } }}>
                 {item.icon}
               </ListItemIcon>
               <ListItemText 
                 primary={item.label}
                 primaryTypographyProps={{
-                  fontSize: '0.95rem',
+                  fontSize: { xs: '0.9rem', md: '0.95rem' },
                   fontWeight: currentView === item.id ? 600 : 400,
                 }}
               />
@@ -121,17 +133,39 @@ export default function NavigationSidebar({ currentView, onNavigate, showOnDashb
       </List>
 
       {/* User Profile Section */}
-      <Box sx={{ mt: 'auto', p: 2 }}>
-        <Divider sx={{ mb: 2 }} />
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-            <AccountIcon />
+      <Box sx={{ mt: 'auto', p: { xs: 1.5, md: 2 } }}>
+        <Divider sx={{ mb: { xs: 1.5, md: 2 } }} />
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          mb: { xs: 1.5, md: 2 },
+          flexDirection: { xs: 'column', md: 'row' },
+          textAlign: { xs: 'center', md: 'left' }
+        }}>
+          <Avatar sx={{ 
+            mr: { xs: 0, md: 2 }, 
+            mb: { xs: 1, md: 0 },
+            bgcolor: 'primary.main',
+            width: { xs: 36, md: 40 },
+            height: { xs: 36, md: 40 }
+          }}>
+            <AccountIcon sx={{ fontSize: { xs: '1.25rem', md: '1.5rem' } }} />
           </Avatar>
           <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-            <Typography variant="subtitle2" noWrap fontWeight={600}>
+            <Typography 
+              variant="subtitle2" 
+              noWrap 
+              fontWeight={600}
+              sx={{ fontSize: { xs: '0.875rem', md: '0.875rem' } }}
+            >
               {userName}
             </Typography>
-            <Typography variant="caption" color="text.secondary" noWrap>
+            <Typography 
+              variant="caption" 
+              color="text.secondary" 
+              noWrap
+              sx={{ fontSize: { xs: '0.75rem', md: '0.75rem' } }}
+            >
               {userEmail}
             </Typography>
           </Box>
@@ -142,7 +176,11 @@ export default function NavigationSidebar({ currentView, onNavigate, showOnDashb
           startIcon={<LogoutIcon />}
           onClick={handleLogout}
           size="small"
-          sx={{ textTransform: 'none' }}
+          sx={{ 
+            textTransform: 'none',
+            minHeight: { xs: '44px', md: '36px' }, // Touch-friendly on mobile
+            fontSize: { xs: '0.875rem', md: '0.875rem' }
+          }}
         >
           Sign Out
         </Button>

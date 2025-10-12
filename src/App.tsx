@@ -23,9 +23,17 @@ export default function App() {
       
       {/* Other pages - with shared navigation sidebar */}
       {currentView !== 'dashboard' && (
-        <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+        <Box sx={{ 
+          display: 'flex', 
+          minHeight: '100vh',
+          flexDirection: { xs: 'column', md: 'row' } // Stack vertically on mobile
+        }}>
           <NavigationSidebar currentView={currentView} onNavigate={navigateToView} />
-          <Box sx={{ flexGrow: 1 }}>
+          <Box sx={{ 
+            flexGrow: 1,
+            minWidth: 0, // Prevent flex overflow on mobile
+            width: { xs: '100%', md: 'auto' }
+          }}>
             {currentView === 'chat' && (
               <ChatApp />
             )}

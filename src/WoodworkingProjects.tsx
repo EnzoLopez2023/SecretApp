@@ -1,9 +1,31 @@
 import { useState, useEffect, useRef } from 'react'
 import { getDocument, GlobalWorkerOptions, version as pdfjsVersion } from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import { ArrowLeft, Calendar, FileText, Paperclip, X, Trash2, Download, Upload } from 'lucide-react'
-import { Box, Typography, Chip, Button } from '@mui/material'
-import { Build as BuildIcon, Add, Edit, Delete, Save as SaveIcon, Close } from '@mui/icons-material'
+import { Calendar, FileText, Paperclip, X, Trash2, Download, Upload } from 'lucide-react'
+import { 
+  Box, 
+  Typography, 
+  Chip, 
+  Button, 
+  TextField, 
+  InputAdornment, 
+  Container, 
+  Paper,
+  Stack,
+  Skeleton,
+  Alert,
+  Snackbar
+} from '@mui/material'
+import { 
+  Build as BuildIcon, 
+  Add, 
+  Edit, 
+  Delete, 
+  Save as SaveIcon, 
+  Close, 
+  Search,
+  ArrowBack
+} from '@mui/icons-material'
 import projectService, { type WoodworkingProject, type ProjectFile, type ProjectFormData } from './services/projectService'
 import './App.css'
 
@@ -39,252 +61,13 @@ export default function WoodworkingProjects() {
     try {
       setLoading(true)
       setError(null)
-
       const data = await projectService.getAllProjects()
       setProjects(data)
-
-      // Don't auto-select first project (let user choose)
     } catch (err) {
       console.error('Error loading projects:', err)
       setError('Failed to load projects from database')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setFormData((prev: ProjectFormData) => ({ ...prev, [name]: value }))
-  }
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files || files.length === 0) {
-      console.log('No files selected')
-      return
-    }
-
-    console.log(`Selected ${files.length} files`)
-    setUploading(true)
-    try {
-      const uploadedFiles: any[] = []
-
-      for (const file of Array.from(files)) {
-        console.log(`Preparing file: ${file.name} (${file.type}, ${file.size} bytes)`)
-        // We'll upload after saving the project
-        uploadedFiles.push({
-          file,
-          name: file.name,
-          type: file.type
-        })
-      }
-
-      setFormData((prev: ProjectFormData) => {
-        const newPendingFiles = [...(prev.pendingFiles || []), ...uploadedFiles]
-        console.log(`Total pending files: ${newPendingFiles.length}`)
-        return {
-          ...prev,
-          pendingFiles: newPendingFiles
-        }
-      })
-
-      // Clear the file input so the same file can be selected again
-      e.target.value = ''
-    } catch (err) {
-      console.error('Error preparing files:', err)
-      alert('Failed to prepare files')
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const removePendingFile = (index: number) => {
-    setFormData((prev: ProjectFormData) => ({
-      ...prev,
-      pendingFiles: prev.pendingFiles?.filter((_file: any, i: number) => i !== index)
-    }))
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!formData.title?.trim()) {
-      alert('Please enter a project title')
-      return
-    }
-
-    setUploading(true)
-    let savedProjectId: string
-
-    try {
-      if (isEditing && selectedProject) {
-        savedProjectId = selectedProject.id
-
-        // Update existing project
-        await projectService.updateProject(selectedProject.id, {
-          title: formData.title,
-          date: formData.date,
-          materials: formData.materials,
-          description: formData.description,
-          status: formData.status
-        })
-
-        // Upload any pending files
-        if (formData.pendingFiles && formData.pendingFiles.length > 0) {
-          console.log(`Uploading ${formData.pendingFiles.length} files...`)
-          for (const pendingFile of formData.pendingFiles) {
-            console.log(`Uploading file: ${pendingFile.name}`)
-            const result = await projectService.uploadFile(selectedProject.id, pendingFile.file)
-            console.log(`File uploaded successfully:`, result)
-          }
-        }
-      } else {
-        // Create new project
-        savedProjectId = Date.now().toString()
-        console.log(`Creating project with ID: ${savedProjectId}`)
-
-        await projectService.createProject({
-          id: savedProjectId,
-          title: formData.title || '',
-          date: formData.date || new Date().toISOString().split('T')[0],
-          materials: formData.materials || '',
-          description: formData.description,
-          status: formData.status || 'planned'
-        })
-
-        // Upload files
-        if (formData.pendingFiles && formData.pendingFiles.length > 0) {
-          console.log(`Uploading ${formData.pendingFiles.length} files for new project...`)
-          for (const pendingFile of formData.pendingFiles) {
-            console.log(`Uploading file: ${pendingFile.name}`)
-            const result = await projectService.uploadFile(savedProjectId, pendingFile.file)
-            console.log(`File uploaded successfully:`, result)
-          }
-        }
-      }
-
-      // Reload projects
-      await loadProjects()
-
-      // Reload the specific project to show the uploaded files
-      const updatedProject = await projectService.getProject(savedProjectId)
-      setSelectedProject(updatedProject)
-
-      // Reset form
-      setShowForm(false)
-      setIsEditing(false)
-      setFormData({
-        title: '',
-        date: new Date().toISOString().split('T')[0],
-        materials: '',
-        description: '',
-        status: 'planned',
-        files: [],
-        pendingFiles: []
-      })
-
-      alert('✅ Project saved successfully!')
-    } catch (err) {
-      console.error('Error saving project:', err)
-      alert(`Failed to save project: ${err instanceof Error ? err.message : String(err)}`)
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const handleEdit = (project: WoodworkingProject) => {
-    setFormData({
-      title: project.title,
-      date: project.date,
-      materials: project.materials,
-      description: project.description,
-      status: project.status,
-      files: project.files,
-      pendingFiles: []
-    })
-    setIsEditing(true)
-    setShowForm(true)
-  }
-
-  const handleDelete = async (projectId: string) => {
-    if (window.confirm('Are you sure you want to delete this project?')) {
-      try {
-        await projectService.deleteProject(projectId)
-        await loadProjects()
-
-        if (selectedProject?.id === projectId) {
-          setSelectedProject(projects.length > 1 ? projects[0] : null)
-        }
-      } catch (err) {
-        console.error('Error deleting project:', err)
-        alert('Failed to delete project')
-      }
-    }
-  }
-
-  const handleDeleteFile = async (fileId: number) => {
-    if (window.confirm('Are you sure you want to delete this file?')) {
-      try {
-        await projectService.deleteFile(fileId)
-        if (selectedProject) {
-          const updated = await projectService.getProject(selectedProject.id)
-          setSelectedProject(updated)
-        }
-      } catch (err) {
-        console.error('Error deleting file:', err)
-        alert('Failed to delete file')
-      }
-    }
-  }
-
-  const handleNewProject = () => {
-    setFormData({
-      title: '',
-      date: new Date().toISOString().split('T')[0],
-      materials: '',
-      description: '',
-      status: 'planned',
-      files: [],
-      pendingFiles: []
-    })
-    setIsEditing(false)
-    setShowForm(true)
-    setShowMobileDetails(true)
-  }
-
-  const handleCancelForm = () => {
-    setShowForm(false)
-    setIsEditing(false)
-    setShowMobileDetails(false)
-    setFormData({
-      title: '',
-      date: new Date().toISOString().split('T')[0],
-      materials: '',
-      description: '',
-      status: 'planned',
-      files: [],
-      pendingFiles: []
-    })
-  }
-
-  const testConnection = async () => {
-    try {
-      // In production, connect directly to backend on port 3001
-      const productionUrl =
-        window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : `http://${window.location.hostname}:3001/api`
-
-      const apiUrl = import.meta.env.DEV ? 'http://localhost:3001/api' : productionUrl
-      const response = await fetch(`${apiUrl}/test`)
-      const data = await response.json()
-
-      if (data.success) {
-        alert('✅ Database connection successful!')
-      } else {
-        alert('❌ Connection failed: ' + data.error)
-      }
-    } catch (error) {
-      console.error('❌ Connection failed:', error)
-      alert('Connection failed: ' + error)
     }
   }
 
@@ -298,524 +81,791 @@ export default function WoodworkingProjects() {
   const getStatusColor = (status?: string) => {
     switch (status) {
       case 'planned':
-        return '#6c757d'
+        return '#ff9800'
       case 'in-progress':
-        return '#ffc107'
+        return '#2196f3'
       case 'completed':
-        return '#28a745'
+        return '#4caf50'
       default:
-        return '#6c757d'
+        return '#757575'
     }
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    return new Date(dateString).toLocaleDateString()
+  }
+
+  const testConnection = async () => {
+    try {
+      // Try to load projects to test connection
+      await projectService.getAllProjects()
+      setError('Database connection successful! ✅')
+      setTimeout(() => setError(null), 3000)
+    } catch (err) {
+      setError('Database connection failed! ❌')
+    }
+  }
+
+  const handleNewProject = () => {
+    setFormData({
+      title: '',
+      date: new Date().toISOString().split('T')[0],
+      materials: '',
+      description: '',
+      status: 'planned',
+      files: []
+    })
+    setIsEditing(false)
+    setShowForm(true)
+    setSelectedProject(null)
+    setShowMobileDetails(true)
+  }
+
+  const handleEdit = (project: WoodworkingProject) => {
+    setFormData({
+      title: project.title,
+      date: project.date,
+      materials: project.materials || '',
+      description: project.description || '',
+      status: project.status,
+      files: project.files || []
+    })
+    setIsEditing(true)
+    setShowForm(true)
+    setShowMobileDetails(true)
+  }
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this project?')) {
+      try {
+        await projectService.deleteProject(id)
+        await loadProjects()
+        setSelectedProject(null)
+        setShowMobileDetails(false)
+      } catch (err) {
+        setError('Failed to delete project')
+      }
+    }
+  }
+
+  const handleCancelForm = () => {
+    setShowForm(false)
+    setIsEditing(false)
+    setShowMobileDetails(false)
+    setFormData({
+      title: '',
+      date: new Date().toISOString().split('T')[0],
+      materials: '',
+      description: '',
+      status: 'planned',
+      files: []
     })
   }
 
-  if (loading) {
-    return (
-      <div className="shop-tools-container">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Loading projects from database...</p>
-        </div>
-      </div>
-    )
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      if (isEditing && selectedProject) {
+        await projectService.updateProject(selectedProject.id, formData)
+      } else {
+        // Create new project data without extra fields
+        const projectData = {
+          id: crypto.randomUUID(), // Generate ID for new project
+          title: formData.title || '',
+          date: formData.date || new Date().toISOString().split('T')[0],
+          materials: formData.materials || '',
+          description: formData.description || '',
+          status: formData.status || 'planned' as const
+        }
+        await projectService.createProject(projectData)
+      }
+      await loadProjects()
+      handleCancelForm()
+    } catch (err) {
+      setError('Failed to save project')
+    }
+  }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length > 0) {
+      setUploading(true)
+      // Convert to base64 for storage
+      Promise.all(
+        files.map(file => {
+          return new Promise<any>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => {
+              resolve({
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                data: reader.result
+              })
+            }
+            reader.readAsDataURL(file)
+          })
+        })
+      ).then(fileData => {
+        setFormData(prev => ({
+          ...prev,
+          pendingFiles: [...(prev.pendingFiles || []), ...fileData]
+        }))
+        setUploading(false)
+      })
+    }
+  }
+
+  const removePendingFile = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      pendingFiles: prev.pendingFiles?.filter((_, i) => i !== index) || []
+    }))
+  }
+
+  const handleDeleteFile = async (fileId: number) => {
+    if (window.confirm('Are you sure you want to delete this file?')) {
+      try {
+        await projectService.deleteFile(fileId)
+        if (selectedProject) {
+          const updatedProject = {
+            ...selectedProject,
+            files: selectedProject.files?.filter(f => f.id !== fileId) || []
+          }
+          setSelectedProject(updatedProject)
+        }
+      } catch (err) {
+        setError('Failed to delete file')
+      }
+    }
   }
 
   return (
-    <div className="shop-tools-container">
-      {/* Header */}
-      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <BuildIcon color="primary" />
-            <Typography variant="h5" component="h1" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-              Woodworking Projects
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <Button
-              onClick={testConnection}
-              variant="outlined"
-              size="small"
-              sx={{ minWidth: 'auto', px: 1 }}
-              title="Test Database Connection"
-            >
-              🔧 Test
-            </Button>
-            <Chip
-              icon={<BuildIcon />}
-              label={loading ? 'Loading...' : `${filteredProjects.length} project${filteredProjects.length !== 1 ? 's' : ''}`}
-              color="primary"
-              variant="outlined"
-              size="small"
-            />
-          </Box>
-        </Box>
-      </Box>
+    <Container maxWidth="xl" sx={{ py: { xs: 1, sm: 2 }, px: { xs: 1, sm: 3 } }}>
+      
+      {/* Error/Success Alert */}
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={() => setError(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert severity={error?.includes('✅') ? 'success' : 'error'} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      </Snackbar>
 
-      {error && (
-        <div style={{ padding: '1rem', backgroundColor: '#fff3cd', borderBottom: '1px solid #ffc107', color: '#856404' }}>
-          ⚠️ {error}
-        </div>
-      )}
-
-      <div className="shop-content">
-        {/* Left Side - Project List */}
-        <div className="tools-list-panel">
-          <div className="search-section">
-            <Button
-              variant="contained"
-              startIcon={<Add />}
-              onClick={handleNewProject}
-              fullWidth
-              size="large"
-              sx={{
-                borderRadius: 2,
-                py: 1.5,
-                textTransform: 'none',
-                fontSize: '1rem',
-                fontWeight: 600,
-                background: 'linear-gradient(45deg, #FF6B35 30%, #F7931E 90%)',
-                boxShadow: '0 3px 5px 2px rgba(255, 107, 53, .3)',
-                '&:hover': {
-                  background: 'linear-gradient(45deg, #E55A2B 30%, #E8841A 90%)',
-                  transform: 'translateY(-1px)',
-                  boxShadow: '0 6px 10px 2px rgba(255, 107, 53, .3)',
-                },
-                transition: 'all 0.3s ease',
-              }}
-            >
-              New Project
-            </Button>
-          </div>
-
-          <div className="search-section" style={{ paddingTop: '0.5rem' }}>
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Search projects..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-
-          <div className="tools-list">
-            {filteredProjects.map((project) => (
-              <div
-                key={project.id}
-                onClick={() => {
-                  setSelectedProject(project)
-                  setShowForm(false)
-                  setShowMobileDetails(true)
-                }}
-                className={`tool-item ${selectedProject?.id === project.id && !showForm ? 'selected' : ''}`}
-              >
-                <div className="tool-name">{project.title}</div>
-                <div className="tool-meta">
-                  <span className="tool-company">{formatDate(project.date)}</span>
-                  <span
-                    className="tool-price"
-                    style={{ backgroundColor: getStatusColor(project.status), color: 'white', padding: '2px 8px', borderRadius: '12px' }}
+      <Box sx={{ 
+        display: 'flex', 
+        gap: { xs: 1, sm: 3 }, 
+        height: { xs: 'calc(100vh - 100px)', sm: 'calc(100vh - 200px)' },
+        flexDirection: { xs: 'column', md: 'row' }
+      }}>
+        {/* Left Panel - Project List */}
+        <Box sx={{ 
+          width: { xs: '100%', md: '400px' }, 
+          flexShrink: 0, 
+          display: { xs: showMobileDetails ? 'none' : 'block', md: 'block' },
+          height: { xs: '100%', md: 'auto' }
+        }}>
+          <Paper sx={{ p: { xs: 2, sm: 3 }, height: '100%', display: 'flex', flexDirection: 'column' }}>
+            {/* Header with Count */}
+            <Box sx={{ mb: { xs: 2, sm: 3 } }}>
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                mb: { xs: 1, sm: 2 },
+                flexDirection: { xs: 'column', sm: 'row' },
+                gap: { xs: 1, sm: 0 }
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <BuildIcon color="primary" />
+                  <Typography 
+                    variant="h6" 
+                    fontWeight={600}
+                    sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
                   >
-                    {project.status}
-                  </span>
-                </div>
-                {project.materials && (
-                  <div className="tool-sku">
-                    {project.materials.substring(0, 50)}
-                    {project.materials.length > 50 ? '...' : ''}
-                  </div>
-                )}
-              </div>
-            ))}
-            {filteredProjects.length === 0 && (
-              <div style={{ padding: '2rem', textAlign: 'center', color: '#6c757d' }}>
-                <p>No projects yet. Click "New Project" to get started!</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Side - Project Details or Form */}
-        <div className={`tool-details-panel ${showMobileDetails ? 'show-mobile' : ''}`}>
-          {showForm ? (
-            <div className="tool-details">
-              {/* Back to List Button (Mobile Only) */}
-              <button
-                onClick={handleCancelForm}
-                className="back-to-list-button mobile-only"
-                style={{
-                  display: 'flex',
+                    Woodworking Projects
+                  </Typography>
+                </Box>
+                <Box sx={{ 
+                  display: 'flex', 
+                  gap: 1, 
                   alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.75rem',
-                  background: '#6c757d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.375rem',
-                  cursor: 'pointer',
-                  marginBottom: '1rem',
-                  width: '100%',
-                  justifyContent: 'center',
-                  fontWeight: '500'
+                  flexDirection: { xs: 'row', sm: 'row' },
+                  justifyContent: { xs: 'center', sm: 'flex-end' }
+                }}>
+                  <Button
+                    onClick={testConnection}
+                    variant="outlined"
+                    size="small"
+                    sx={{ 
+                      minWidth: 'auto', 
+                      px: { xs: 1, sm: 1 },
+                      fontSize: { xs: '0.7rem', sm: '0.875rem' }
+                    }}
+                    title="Test Database Connection"
+                  >
+                    🔧 Test
+                  </Button>
+                  <Chip
+                    icon={<BuildIcon />}
+                    label={loading ? 'Loading...' : `${filteredProjects.length} project${filteredProjects.length !== 1 ? 's' : ''}`}
+                    color="primary"
+                    variant="outlined"
+                    size="small"
+                  />
+                </Box>
+              </Box>
+              
+              {/* Modern Search Box */}
+              <TextField
+                fullWidth
+                placeholder="Search projects..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search color="action" />
+                    </InputAdornment>
+                  ),
+                }}
+                variant="outlined"
+                size="medium"
+                sx={{
+                  mb: 2,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    backgroundColor: 'background.default',
+                    '&:hover': {
+                      backgroundColor: 'action.hover',
+                    },
+                    '&.Mui-focused': {
+                      backgroundColor: 'background.paper',
+                    },
+                  },
+                }}
+              />
+              
+              {/* Modern Add Button */}
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={handleNewProject}
+                fullWidth
+                size="large"
+                sx={{
+                  borderRadius: 2,
+                  py: { xs: 1.25, sm: 1.5 },
+                  textTransform: 'none',
+                  fontSize: { xs: '0.9rem', sm: '1rem' },
+                  fontWeight: 600,
+                  background: 'linear-gradient(45deg, #FF6B35 30%, #F7931E 90%)',
+                  boxShadow: '0 3px 5px 2px rgba(255, 107, 53, .3)',
+                  minHeight: { xs: '48px', sm: '56px' },
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #E55A2B 30%, #E8841A 90%)',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 6px 10px 2px rgba(255, 107, 53, .3)',
+                  },
+                  transition: 'all 0.3s ease',
                 }}
               >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Project List
-              </button>
+                New Project
+              </Button>
+            </Box>
 
-              <div className="details-header">
-                <h2 className="details-title">{isEditing ? 'Edit Project' : 'New Project'}</h2>
-                <Button
-                  onClick={handleCancelForm}
-                  variant="outlined"
-                  startIcon={<Close />}
-                  sx={{
-                    ml: 'auto',
-                    borderRadius: 2,
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    borderColor: 'grey.400',
-                    color: 'grey.600',
-                    '&:hover': {
-                      borderColor: 'grey.600',
-                      backgroundColor: 'grey.50',
-                      transform: 'translateY(-1px)',
-                    },
-                    transition: 'all 0.3s ease',
-                    display: { xs: 'none', sm: 'flex' },
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
+            {/* Projects List */}
+            <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+              {loading ? (
+                <Stack spacing={1}>
+                  {[...Array(5)].map((_, i) => (
+                    <Skeleton key={i} variant="rectangular" height={80} />
+                  ))}
+                </Stack>
+              ) : filteredProjects.length === 0 ? (
+                <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
+                  <BuildIcon sx={{ fontSize: 48, mb: 2 }} />
+                  <Typography>No projects found</Typography>
+                </Box>
+              ) : (
+                filteredProjects.map((project) => (
+                  <Paper
+                    key={project.id}
+                    elevation={selectedProject?.id === project.id ? 3 : 1}
+                    sx={{
+                      p: 2,
+                      mb: 1,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      borderLeft: selectedProject?.id === project.id ? 3 : 0,
+                      borderLeftColor: 'primary.main',
+                      bgcolor: selectedProject?.id === project.id ? 'action.selected' : 'background.paper',
+                      '&:hover': {
+                        elevation: 2,
+                        bgcolor: 'action.hover',
+                      },
+                    }}
+                    onClick={() => {
+                      setSelectedProject(project)
+                      setShowForm(false)
+                      setShowMobileDetails(true)
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1rem' }}>
+                        {project.title}
+                      </Typography>
+                      <Chip
+                        label={project.status}
+                        size="small"
+                        sx={{
+                          bgcolor: getStatusColor(project.status),
+                          color: 'white',
+                          fontWeight: 500,
+                        }}
+                      />
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      {formatDate(project.date)}
+                    </Typography>
+                    {project.materials && (
+                      <Typography 
+                        variant="body2" 
+                        color="text.secondary"
+                        sx={{ 
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {project.materials.substring(0, 50)}...
+                      </Typography>
+                    )}
+                  </Paper>
+                ))
+              )}
+            </Box>
+          </Paper>
+        </Box>
 
-              <form onSubmit={handleSubmit} className="project-form">
-                <div className="form-group">
-                  <label htmlFor="title">Project Title *</label>
-                  <input type="text" id="title" name="title" value={formData.title} onChange={handleInputChange} className="search-input" required />
-                </div>
+        {/* Right Panel - Project Details or Form */}
+        <Box sx={{ 
+          flexGrow: 1, 
+          display: { xs: showMobileDetails ? 'block' : 'none', md: 'block' },
+          height: { xs: '100%', md: 'auto' }
+        }}>
+          <Paper sx={{ p: { xs: 2, sm: 3 }, height: '100%', overflow: 'auto' }}>
+            {showForm ? (
+              <Box>
+                {/* Mobile Back Button */}
+                <Box sx={{ display: { xs: 'block', md: 'none' }, mb: 2 }}>
+                  <Button
+                    onClick={handleCancelForm}
+                    startIcon={<ArrowBack />}
+                    variant="outlined"
+                    fullWidth
+                    sx={{
+                      minHeight: '48px',
+                      borderRadius: 2,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      fontSize: '0.9rem',
+                      borderColor: 'primary.main',
+                      color: 'primary.main',
+                      '&:hover': {
+                        backgroundColor: 'primary.50',
+                        borderColor: 'primary.dark',
+                      },
+                    }}
+                  >
+                    Back to Project List
+                  </Button>
+                </Box>
 
-                <div className="form-group">
-                  <label htmlFor="date">Date</label>
-                  <input type="date" id="date" name="date" value={formData.date} onChange={handleInputChange} className="search-input" />
-                </div>
+                {/* Form Header */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                    {isEditing ? 'Edit Project' : 'New Project'}
+                  </Typography>
+                  <Button
+                    onClick={handleCancelForm}
+                    variant="outlined"
+                    startIcon={<Close />}
+                    sx={{
+                      borderRadius: 2,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      borderColor: 'grey.400',
+                      color: 'grey.600',
+                      minHeight: { xs: '44px', sm: '48px' },
+                      fontSize: { xs: '0.875rem', sm: '1rem' },
+                      '&:hover': {
+                        borderColor: 'grey.600',
+                        backgroundColor: 'grey.50',
+                        transform: 'translateY(-1px)',
+                      },
+                      transition: 'all 0.3s ease',
+                      display: { xs: 'none', sm: 'flex' },
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </Box>
 
-                <div className="form-group">
-                  <label htmlFor="status">Status</label>
-                  <select id="status" name="status" value={formData.status} onChange={handleInputChange} className="search-input">
+                {/* Form */}
+                <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <TextField
+                    label="Project Title"
+                    name="title"
+                    value={formData.title}
+                    onChange={handleInputChange}
+                    required
+                    fullWidth
+                    variant="outlined"
+                  />
+
+                  <TextField
+                    label="Date"
+                    name="date"
+                    type="date"
+                    value={formData.date}
+                    onChange={handleInputChange}
+                    fullWidth
+                    variant="outlined"
+                    InputLabelProps={{ shrink: true }}
+                  />
+
+                  <TextField
+                    select
+                    label="Status"
+                    name="status"
+                    value={formData.status}
+                    onChange={handleInputChange}
+                    fullWidth
+                    variant="outlined"
+                    SelectProps={{ native: true }}
+                  >
                     <option value="planned">Planned</option>
                     <option value="in-progress">In Progress</option>
                     <option value="completed">Completed</option>
-                  </select>
-                </div>
+                  </TextField>
 
-                <div className="form-group">
-                  <label htmlFor="materials">Materials</label>
-                  <textarea
-                    id="materials"
+                  <TextField
+                    label="Materials"
                     name="materials"
                     value={formData.materials}
                     onChange={handleInputChange}
-                    className="search-input"
+                    multiline
                     rows={3}
+                    fullWidth
+                    variant="outlined"
                     placeholder="List the materials needed..."
                   />
-                </div>
 
-                <div className="form-group">
-                  <label htmlFor="description">Description</label>
-                  <textarea
-                    id="description"
+                  <TextField
+                    label="Description"
                     name="description"
                     value={formData.description}
                     onChange={handleInputChange}
-                    className="search-input"
+                    multiline
                     rows={5}
+                    fullWidth
+                    variant="outlined"
                     placeholder="Describe your project..."
                   />
-                </div>
 
-                <div className="form-group">
-                  <label htmlFor="files">
-                    <Upload className="w-4 h-4" style={{ display: 'inline', marginRight: '0.5rem' }} />
-                    Upload Files to Database (Images, PDFs, etc.)
-                  </label>
-                  <input
-                    type="file"
-                    id="files"
-                    onChange={handleFileUpload}
-                    multiple
-                    accept="image/*,.pdf,.doc,.docx"
+                  {/* File Upload */}
+                  <Box>
+                    <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Upload className="w-4 h-4" />
+                      Upload Files
+                    </Typography>
+                    <input
+                      type="file"
+                      onChange={handleFileUpload}
+                      multiple
+                      accept="image/*,.pdf,.doc,.docx"
+                      disabled={uploading}
+                      style={{ marginBottom: '1rem' }}
+                    />
+                    {uploading && (
+                      <Typography color="warning.main" sx={{ mb: 2 }}>
+                        Preparing files...
+                      </Typography>
+                    )}
+
+                    {formData.pendingFiles && formData.pendingFiles.length > 0 && (
+                      <Stack spacing={1} sx={{ mb: 2 }}>
+                        {formData.pendingFiles.map((file: any, index: number) => (
+                          <Paper key={index} sx={{ p: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Paperclip className="w-4 h-4" />
+                            <Typography sx={{ flex: 1 }}>{file.name}</Typography>
+                            <Button
+                              size="small"
+                              color="error"
+                              onClick={() => removePendingFile(index)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </Paper>
+                        ))}
+                      </Stack>
+                    )}
+                  </Box>
+
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    startIcon={<SaveIcon />}
                     disabled={uploading}
-                    style={{ display: 'block', marginTop: '0.5rem' }}
-                  />
-                  {uploading && <p style={{ color: '#ffc107', marginTop: '0.5rem' }}>Preparing files...</p>}
-
-                  {formData.pendingFiles && formData.pendingFiles.length > 0 && (
-                    <div className="attached-files" style={{ marginTop: '1rem' }}>
-                      {formData.pendingFiles.map((file: any, index: number) => (
-                        <div
-                          key={index}
-                          className="file-item"
-                          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', backgroundColor: '#f8f9fa', borderRadius: '4px', marginBottom: '0.5rem' }}
-                        >
-                          <Paperclip className="w-4 h-4" />
-                          <span style={{ flex: 1 }}>{file.name}</span>
-                          <button type="button" onClick={() => removePendingFile(index)} style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer' }}>
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <Button
-                  type="submit"
-                  variant="contained"
-                  startIcon={<SaveIcon />}
-                  disabled={uploading}
-                  sx={{
-                    mt: 2,
-                    borderRadius: 2,
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
-                    boxShadow: '0 3px 5px 2px rgba(33, 203, 243, .3)',
-                    '&:hover': {
-                      background: 'linear-gradient(45deg, #1976D2 30%, #1CB5E0 90%)',
-                      transform: 'translateY(-1px)',
-                      boxShadow: '0 6px 10px 2px rgba(33, 203, 243, .3)',
-                    },
-                    '&:disabled': {
-                      background: 'linear-gradient(45deg, #90CAF9 30%, #BBDEFB 90%)',
-                      transform: 'none',
-                      boxShadow: 'none',
-                    },
-                    transition: 'all 0.3s ease',
-                  }}
-                >
-                  {uploading ? 'Saving...' : isEditing ? 'Update Project' : 'Save Project'}
-                </Button>
-              </form>
-            </div>
-          ) : selectedProject ? (
-            <div className="tool-details">
-              {/* Back to List Button (Mobile Only) */}
-              <button
-                onClick={() => {
-                  setSelectedProject(null)
-                  setShowMobileDetails(false)
-                }}
-                className="back-to-list-button mobile-only"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.75rem',
-                  background: '#6c757d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.375rem',
-                  cursor: 'pointer',
-                  marginBottom: '1rem',
-                  width: '100%',
-                  justifyContent: 'center',
-                  fontWeight: '500'
-                }}
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Project List
-              </button>
-
-              <div className="details-header">
-                <div>
-                  <h2 className="details-title">{selectedProject.title}</h2>
-                  <span className="tag" style={{ backgroundColor: getStatusColor(selectedProject.status), color: 'white', marginTop: '0.5rem', display: 'inline-block' }}>
-                    {selectedProject.status}
-                  </span>
-                </div>
-                <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
-                  <Button
-                    variant="contained"
-                    startIcon={<Edit />}
-                    onClick={() => handleEdit(selectedProject)}
+                    fullWidth
                     sx={{
+                      mt: 2,
                       borderRadius: 2,
                       textTransform: 'none',
                       fontWeight: 600,
-                      background: 'linear-gradient(45deg, #4CAF50 30%, #66BB6A 90%)',
-                      boxShadow: '0 3px 5px 2px rgba(76, 175, 80, .3)',
+                      background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                      boxShadow: '0 3px 5px 2px rgba(33, 203, 243, .3)',
+                      minHeight: { xs: '48px', sm: '56px' },
+                      fontSize: { xs: '0.9rem', sm: '1rem' },
                       '&:hover': {
-                        background: 'linear-gradient(45deg, #388E3C 30%, #4CAF50 90%)',
+                        background: 'linear-gradient(45deg, #1976D2 30%, #1CB5E0 90%)',
                         transform: 'translateY(-1px)',
-                        boxShadow: '0 6px 10px 2px rgba(76, 175, 80, .3)',
+                        boxShadow: '0 6px 10px 2px rgba(33, 203, 243, .3)',
+                      },
+                      '&:disabled': {
+                        background: 'linear-gradient(45deg, #90CAF9 30%, #BBDEFB 90%)',
+                        transform: 'none',
+                        boxShadow: 'none',
                       },
                       transition: 'all 0.3s ease',
                     }}
                   >
-                    Edit
-                  </Button>
-                  <Button
-                    variant="contained"
-                    startIcon={<Delete />}
-                    onClick={() => handleDelete(selectedProject.id)}
-                    sx={{
-                      borderRadius: 2,
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      background: 'linear-gradient(45deg, #f44336 30%, #e57373 90%)',
-                      boxShadow: '0 3px 5px 2px rgba(244, 67, 54, .3)',
-                      '&:hover': {
-                        background: 'linear-gradient(45deg, #d32f2f 30%, #f44336 90%)',
-                        transform: 'translateY(-1px)',
-                        boxShadow: '0 6px 10px 2px rgba(244, 67, 54, .3)',
-                      },
-                      transition: 'all 0.3s ease',
-                    }}
-                  >
-                    Delete
+                    {uploading ? 'Saving...' : isEditing ? 'Update Project' : 'Save Project'}
                   </Button>
                 </Box>
-              </div>
+              </Box>
+            ) : selectedProject ? (
+              <Box>
+                {/* Mobile Back Button */}
+                <Box sx={{ display: { xs: 'block', md: 'none' }, mb: 2 }}>
+                  <Button
+                    onClick={() => {
+                      setSelectedProject(null)
+                      setShowMobileDetails(false)
+                    }}
+                    startIcon={<ArrowBack />}
+                    variant="outlined"
+                    fullWidth
+                    sx={{
+                      minHeight: '48px',
+                      borderRadius: 2,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      fontSize: '0.9rem',
+                      borderColor: 'primary.main',
+                      color: 'primary.main',
+                      '&:hover': {
+                        backgroundColor: 'primary.50',
+                        borderColor: 'primary.dark',
+                      },
+                    }}
+                  >
+                    Back to Project List
+                  </Button>
+                </Box>
 
-              <div className="details-grid">
-                <div className="detail-item">
-                  <span className="detail-label">
-                    <Calendar className="w-4 h-4" style={{ display: 'inline', marginRight: '0.5rem' }} />
-                    Date
-                  </span>
-                  <span className="detail-value">{formatDate(selectedProject.date)}</span>
-                </div>
+                {/* Project Details Header */}
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold' }}>
+                    {selectedProject.title}
+                  </Typography>
+                  
+                  <Chip
+                    label={selectedProject.status}
+                    sx={{
+                      bgcolor: getStatusColor(selectedProject.status),
+                      color: 'white',
+                      mb: 2,
+                    }}
+                  />
 
-                <div className="detail-item">
-                  <span className="detail-label">Created</span>
-                  <span className="detail-value">{new Date(selectedProject.created_at).toLocaleDateString()}</span>
-                </div>
-              </div>
+                  {/* Edit/Delete Buttons */}
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                    <Button
+                      variant="contained"
+                      startIcon={<Edit />}
+                      onClick={() => handleEdit(selectedProject)}
+                      fullWidth
+                      sx={{
+                        borderRadius: 2,
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        background: 'linear-gradient(45deg, #4CAF50 30%, #66BB6A 90%)',
+                        boxShadow: '0 3px 5px 2px rgba(76, 175, 80, .3)',
+                        minHeight: { xs: '48px', sm: '40px' },
+                        fontSize: { xs: '0.9rem', sm: '0.875rem' },
+                        '&:hover': {
+                          background: 'linear-gradient(45deg, #388E3C 30%, #4CAF50 90%)',
+                          transform: 'translateY(-1px)',
+                          boxShadow: '0 6px 10px 2px rgba(76, 175, 80, .3)',
+                        },
+                        transition: 'all 0.3s ease',
+                      }}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="contained"
+                      startIcon={<Delete />}
+                      onClick={() => handleDelete(selectedProject.id)}
+                      fullWidth
+                      sx={{
+                        borderRadius: 2,
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        background: 'linear-gradient(45deg, #f44336 30%, #e57373 90%)',
+                        boxShadow: '0 3px 5px 2px rgba(244, 67, 54, .3)',
+                        minHeight: { xs: '48px', sm: '40px' },
+                        fontSize: { xs: '0.9rem', sm: '0.875rem' },
+                        '&:hover': {
+                          background: 'linear-gradient(45deg, #d32f2f 30%, #f44336 90%)',
+                          transform: 'translateY(-1px)',
+                          boxShadow: '0 6px 10px 2px rgba(244, 67, 54, .3)',
+                        },
+                        transition: 'all 0.3s ease',
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </Stack>
+                </Box>
 
-              {selectedProject.materials && (
-                <div className="detail-section">
-                  <h3 className="section-title">
-                    <FileText className="w-4 h-4" />
-                    Materials
-                  </h3>
-                  <p className="section-content" style={{ whiteSpace: 'pre-wrap' }}>
-                    {selectedProject.materials}
-                  </p>
-                </div>
-              )}
-
-              {selectedProject.description && (
-                <div className="detail-section">
-                  <h3 className="section-title">Description</h3>
-                  <p className="section-content" style={{ whiteSpace: 'pre-wrap' }}>
-                    {selectedProject.description}
-                  </p>
-                </div>
-              )}
-
-              {selectedProject.files && selectedProject.files.length > 0 && (
-                <div className="detail-section">
-                  <h3 className="section-title">
-                    <Paperclip className="w-4 h-4" />
-                    Attached Files ({selectedProject.files.length})
-                  </h3>
-                  <div className="files-grid">
-                    {selectedProject.files.map((file: ProjectFile) => (
-                      <div key={file.id} className="file-preview">
-                        {file.file_type.startsWith('image/') ? (
-                          <img src={projectService.getFileUrl(file.id!)} alt={file.file_name} style={{ maxWidth: '100%', borderRadius: '8px', marginBottom: '0.5rem' }} />
-                        ) : file.file_type === 'application/pdf' ? (
-                          file.id ? (
-                            <PdfAttachmentViewer file={file} />
-                          ) : (
-                            <div style={{ padding: '2rem', backgroundColor: '#f8f9fa', borderRadius: '8px', textAlign: 'center', marginBottom: '0.5rem' }}>
-                              <p style={{ marginBottom: '0.5rem' }}>Unable to preview this PDF (missing identifier).</p>
-                              <a
-                                href={projectService.getFileUrl(file.id ?? 0)}
+                {/* Project Details Content */}
+                <Stack spacing={3}>
+                  <Box>
+                    <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+                      <Calendar className="w-4 h-4" style={{ display: 'inline', marginRight: '0.5rem' }} />
+                      Date: {formatDate(selectedProject.date)}
+                    </Typography>
+                    <Typography variant="body1" color="text.secondary">
+                      Created: {new Date(selectedProject.created_at).toLocaleDateString()}
+                    </Typography>
+                  </Box>
+                  
+                  {selectedProject.materials && (
+                    <Box>
+                      <Typography variant="h6" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <FileText className="w-4 h-4" />
+                        Materials
+                      </Typography>
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                        {selectedProject.materials}
+                      </Typography>
+                    </Box>
+                  )}
+                  
+                  {selectedProject.description && (
+                    <Box>
+                      <Typography variant="h6" sx={{ mb: 1 }}>Description</Typography>
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                        {selectedProject.description}
+                      </Typography>
+                    </Box>
+                  )}
+                  
+                  {selectedProject.files && selectedProject.files.length > 0 && (
+                    <Box>
+                      <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Paperclip className="w-4 h-4" />
+                        Attached Files ({selectedProject.files.length})
+                      </Typography>
+                      <Stack spacing={2}>
+                        {selectedProject.files.map((file: ProjectFile) => (
+                          <Paper key={file.id} elevation={2} sx={{ p: 2 }}>
+                            {file.file_type.startsWith('image/') ? (
+                              <Box sx={{ mb: 2 }}>
+                                <img 
+                                  src={projectService.getFileUrl(file.id!)} 
+                                  alt={file.file_name} 
+                                  style={{ maxWidth: '100%', borderRadius: '8px' }} 
+                                />
+                              </Box>
+                            ) : file.file_type === 'application/pdf' && file.id ? (
+                              <Box sx={{ mb: 2 }}>
+                                <PdfAttachmentViewer file={file} />
+                              </Box>
+                            ) : (
+                              <Box sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                p: 4, 
+                                bgcolor: 'grey.100', 
+                                borderRadius: 2,
+                                mb: 2
+                              }}>
+                                <Paperclip className="w-8 h-8" />
+                              </Box>
+                            )}
+                            
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="body2" sx={{ flex: 1 }}>
+                                {file.file_name}
+                              </Typography>
+                              <Button
+                                size="small"
+                                href={projectService.getFileUrl(file.id!)}
                                 target="_blank"
-                                rel="noopener noreferrer"
-                                style={{
-                                  display: 'inline-block',
-                                  marginTop: '0.5rem',
-                                  padding: '0.5rem 1rem',
-                                  backgroundColor: '#0d6efd',
-                                  color: 'white',
-                                  borderRadius: '0.375rem',
-                                  textDecoration: 'none'
-                                }}
+                                startIcon={<Download className="w-4 h-4" />}
                               >
-                                Open PDF in New Tab
-                              </a>
-                            </div>
-                          )
-                        ) : (
-                          <div style={{ padding: '2rem', backgroundColor: '#f8f9fa', borderRadius: '8px', textAlign: 'center', marginBottom: '0.5rem' }}>
-                            <Paperclip className="w-8 h-8" style={{ margin: '0 auto' }} />
-                          </div>
-                        )}
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                          <a
-                            href={projectService.getFileUrl(file.id!)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="external-link"
-                            style={{ fontSize: '0.875rem', flex: 1 }}
-                          >
-                            <FileText className="w-3 h-3" style={{ display: 'inline', marginRight: '0.25rem' }} />
-                            {file.file_name}
-                          </a>
-                          <a
-                            href={projectService.getFileUrl(file.id!)}
-                            download={file.file_name}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: '#0d6efd',
-                              cursor: 'pointer',
-                              padding: '0.25rem',
-                              textDecoration: 'none',
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}
-                            title="Download file"
-                          >
-                            <Download className="w-4 h-4" />
-                          </a>
-                          <button
-                            onClick={() => handleDeleteFile(file.id!)}
-                            style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', padding: '0.25rem' }}
-                            title="Delete file"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="no-selection">
-              <BuildIcon sx={{ fontSize: 64, color: 'text.disabled' }} />
-              <p>Select a project or create a new one!</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+                                Download
+                              </Button>
+                              <Button
+                                size="small"
+                                color="error"
+                                onClick={() => handleDeleteFile(file.id!)}
+                                startIcon={<Trash2 className="w-4 h-4" />}
+                              >
+                                Delete
+                              </Button>
+                            </Box>
+                          </Paper>
+                        ))}
+                      </Stack>
+                    </Box>
+                  )}
+                </Stack>
+              </Box>
+            ) : (
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                height: '50%', 
+                color: 'text.secondary' 
+              }}>
+                <BuildIcon sx={{ fontSize: 64, mb: 2 }} />
+                <Typography>Select a project or create a new one!</Typography>
+              </Box>
+            )}
+          </Paper>
+        </Box>
+      </Box>
+    </Container>
   )
 }
 
+// PDF Viewer Component
 interface PdfAttachmentViewerProps {
   file: ProjectFile
 }
@@ -858,27 +908,19 @@ function PdfAttachmentViewer({ file }: PdfAttachmentViewerProps) {
         }
 
         const arrayBuffer = await response.arrayBuffer()
-        if (cancelled) {
-          return
-        }
+        if (cancelled) return
 
         pdfDoc = await getDocument({ data: arrayBuffer }).promise
-        if (cancelled) {
-          return
-        }
+        if (cancelled) return
 
         for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
           const page = await pdfDoc.getPage(pageNum)
-          if (cancelled) {
-            return
-          }
+          if (cancelled) return
 
-    const viewport = page.getViewport({ scale: 2.4 })
+          const viewport = page.getViewport({ scale: 1.5 })
           const canvas = document.createElement('canvas')
           const context = canvas.getContext('2d')
-          if (!context) {
-            continue
-          }
+          if (!context) continue
 
           canvas.width = viewport.width
           canvas.height = viewport.height
@@ -915,28 +957,34 @@ function PdfAttachmentViewer({ file }: PdfAttachmentViewerProps) {
   }, [file.id])
 
   return (
-    <div
-      style={{
-  width: '100%',
-  maxHeight: '1200px',
-        overflowY: 'auto',
-        border: '1px solid #dee2e6',
-        borderRadius: '8px',
-        padding: '1rem',
-        backgroundColor: '#ffffff',
-        marginBottom: '0.5rem'
-      }}
-    >
-      {loading && <p style={{ color: '#6c757d', margin: 0 }}>Rendering PDF...</p>}
+    <Box sx={{
+      width: '100%',
+      maxHeight: '800px',
+      overflowY: 'auto',
+      border: '1px solid',
+      borderColor: 'divider',
+      borderRadius: 2,
+      p: 2,
+      bgcolor: 'background.paper',
+    }}>
+      {loading && (
+        <Typography color="text.secondary">Rendering PDF...</Typography>
+      )}
       {error && (
-        <p style={{ color: '#dc3545', margin: 0 }}>
+        <Typography color="error">
           Unable to render PDF: {error}.{' '}
-          <a href={projectService.getFileUrl(file.id!)} target="_blank" rel="noopener noreferrer">
+          <Button
+            component="a"
+            href={projectService.getFileUrl(file.id!)}
+            target="_blank"
+            rel="noopener noreferrer"
+            size="small"
+          >
             Open in new tab
-          </a>
-        </p>
+          </Button>
+        </Typography>
       )}
       <div ref={containerRef} />
-    </div>
+    </Box>
   )
 }
