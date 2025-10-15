@@ -28,6 +28,7 @@ import {
 import { AzureOpenAI } from "openai"
 import shopData from './assets/MyShop.json'
 import { isPlexQuestion, generatePlexContext } from './ChatAgent/PlexAgent'
+import MarkdownRenderer from './components/MarkdownRenderer'
 
 // Azure OpenAI configuration
 const endpoint = "https://enzol-mgr7she7-swedencentral.cognitiveservices.azure.com/";
@@ -355,7 +356,7 @@ export default function ChatApp() {
       
       // Add system message and conversation history with enhanced question
       const messages = [
-        { role: 'system', content: 'You are a helpful assistant.' },
+        { role: 'system', content: 'You are a helpful assistant. Format your responses using Markdown for better readability. Use **bold** for emphasis, *italics* for movie titles and character names, bullet points for lists, and proper headings when appropriate. For movie information, organize details clearly with headers and lists.' },
         ...conversationHistory,
         { role: 'user', content: enhancedQuestion }
       ]
@@ -627,16 +628,22 @@ export default function ChatApp() {
                           : 'none'
                       }}
                     >
-                      <Typography 
-                        variant="body1" 
-                        sx={{ 
-                          whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-word',
-                          lineHeight: 1.6
-                        }}
-                      >
-                        {message.content}
-                      </Typography>
+                      {message.type === 'assistant' ? (
+                        <MarkdownRenderer>
+                          {message.content}
+                        </MarkdownRenderer>
+                      ) : (
+                        <Typography 
+                          variant="body1" 
+                          sx={{ 
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                            lineHeight: 1.6
+                          }}
+                        >
+                          {message.content}
+                        </Typography>
+                      )}
                       
                       <Typography 
                         variant="caption" 

@@ -157,6 +157,68 @@ app.get('/api/plex/sections/:key/all', async (req, res) => {
 })
 
 // Get library statistics (helper endpoint for chatbot)
+// Search for movies in Plex library
+app.get('/api/plex/search', async (req, res) => {
+  try {
+    const { query, type = 'movie' } = req.query
+
+    if (!query) {
+      return res.status(400).json({ error: 'Search query is required' })
+    }
+
+    // Search across all movie libraries
+    const sectionsUrl = `${plexConfig.baseUrl}/library/sections?X-Plex-Token=${plexConfig.token}`
+    const sectionsResponse = await fetch(sectionsUrl, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      agent: plexAgent
+    })
+
+    if (!sectionsResponse.ok) {
+      throw new Error(`Plex sections request failed`)
+    }
+
+    const sectionsData = await sectionsResponse.json()
+    const movieSections = sectionsData.MediaContainer?.Directory?.filter(section => section.type === type) || []
+
+    let allMovies = []
+
+    // Search in each movie section
+    for (const section of movieSections) {
+      try {
+        const searchUrl = `${plexConfig.baseUrl}/library/sections/${section.key}/search?query=${encodeURIComponent(query)}&X-Plex-Token=${plexConfig.token}`
+        const searchResponse = await fetch(searchUrl, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+          agent: plexAgent
+        })
+
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json()
+          const movies = searchData.MediaContainer?.Metadata || []
+          
+          const processedMovies = movies.map(movie => ({
+            title: movie.title,
+            year: movie.year,
+            key: movie.key,
+            guid: movie.guid,
+            section: section.title
+          }))
+          
+          allMovies.push(...processedMovies)
+        }
+      } catch (err) {
+        console.error(`Error searching in section ${section.key}:`, err)
+      }
+    }
+
+    res.json({ movies: allMovies })
+  } catch (error) {
+    console.error('Plex search error:', error)
+    res.status(500).json({ error: 'Failed to search Plex library' })
+  }
+})
+
 app.get('/api/plex/stats', async (req, res) => {
   try {
     // Get all sections
@@ -219,6 +281,71 @@ app.get('/api/plex/stats', async (req, res) => {
   } catch (error) {
     console.error('Plex stats fetch error:', error)
     res.status(500).json({ error: 'Failed to fetch Plex library statistics' })
+  }
+})
+
+// ============================================
+// Movie Details from External API (OMDb)
+// ============================================
+
+app.get('/api/movie/details', async (req, res) => {
+  try {
+    const { title, year } = req.query
+
+    if (!title) {
+      return res.status(400).json({ error: 'Movie title is required' })
+    }
+
+    // OMDb API key - you may want to use environment variable for this
+    const omdbApiKey = process.env.OMDB_API_KEY || 'b8d33d3c' // Free tier key, replace with your own
+
+    let omdbUrl = `http://www.omdbapi.com/?apikey=${omdbApiKey}&t=${encodeURIComponent(title)}&plot=full`
+    if (year) {
+      omdbUrl += `&y=${year}`
+    }
+
+    console.log(`🎬 Fetching movie details for: "${title}"${year ? ` (${year})` : ''}`)
+
+    const omdbResponse = await fetch(omdbUrl)
+    
+    if (!omdbResponse.ok) {
+      throw new Error(`OMDb API request failed with status ${omdbResponse.status}`)
+    }
+
+    const movieData = await omdbResponse.json()
+
+    if (movieData.Error) {
+      return res.status(404).json({ error: `Movie not found: ${movieData.Error}` })
+    }
+
+    // Transform OMDb response to our format
+    const movieDetails = {
+      title: movieData.Title,
+      year: movieData.Year,
+      rated: movieData.Rated,
+      released: movieData.Released,
+      runtime: movieData.Runtime,
+      genre: movieData.Genre,
+      director: movieData.Director,
+      writer: movieData.Writer,
+      actors: movieData.Actors,
+      plot: movieData.Plot,
+      language: movieData.Language,
+      country: movieData.Country,
+      awards: movieData.Awards,
+      poster: movieData.Poster,
+      imdbRating: movieData.imdbRating,
+      imdbVotes: movieData.imdbVotes,
+      boxOffice: movieData.BoxOffice,
+      production: movieData.Production
+    }
+
+    console.log(`✅ Successfully fetched details for: "${movieDetails.title}" (${movieDetails.year})`)
+    res.json(movieDetails)
+
+  } catch (error) {
+    console.error('Movie details fetch error:', error)
+    res.status(500).json({ error: 'Failed to fetch movie details from external source' })
   }
 })
 
