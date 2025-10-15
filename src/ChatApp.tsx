@@ -25,8 +25,48 @@ import {
   Clear as ClearIcon,
   AutoAwesome as SparkleIcon
 } from '@mui/icons-material'
+import { AzureOpenAI } from "openai"
 import shopData from './assets/MyShop.json'
 import { isPlexQuestion, generatePlexContext } from './ChatAgent/PlexAgent'
+
+// Azure OpenAI configuration
+const endpoint = "https://enzol-mgr7she7-swedencentral.cognitiveservices.azure.com/";
+const modelName = "gpt-5-chat";
+const deployment = "gpt-5-chat";
+
+export async function callAzureOpenAI(messages: Array<{role: string, content: string}>) {
+  const apiKey = "CMAJXHUEw8cWYiD6bd6UhnjIqxYLO7FngHwiuIOkpRjcIABZKVBxJQQJ99BJACfhMk5XJ3w3AAAAACOGxNoa";
+  const apiVersion = "2024-04-01-preview";
+  const options = { 
+    endpoint, 
+    apiKey, 
+    deployment, 
+    apiVersion,
+    dangerouslyAllowBrowser: true 
+  }
+
+  console.log('🔧 Making API call with:', {
+    endpoint: endpoint,
+    deployment: deployment,
+    model: modelName,
+    apiVersion: apiVersion
+  });
+
+  const client = new AzureOpenAI(options);
+
+  const response = await client.chat.completions.create({
+    messages: messages.map(msg => ({
+      role: msg.role as "system" | "user" | "assistant",
+      content: msg.content
+    })),
+    max_tokens: 16384,
+    temperature: 1,
+    top_p: 1,
+    model: modelName
+  });
+
+  return response.choices[0]?.message?.content || 'No response received';
+}
 
 // Define the type for inventory items
 interface InventoryItem {
@@ -240,10 +280,13 @@ export default function ChatApp() {
   const [conversation, setConversation] = useState<ConversationMessage[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Debug: Check if Azure OpenAI credentials are loaded
-  console.log('Azure endpoint loaded:', !!import.meta.env.VITE_AZURE_OPENAI_ENDPOINT)
-  console.log('Azure API key loaded:', !!import.meta.env.VITE_AZURE_OPENAI_API_KEY)
-  console.log('Endpoint:', import.meta.env.VITE_AZURE_OPENAI_ENDPOINT)
+  // Debug: Azure OpenAI GPT-5 configuration
+  console.log('=== Azure OpenAI Configuration ===')
+  console.log('Endpoint:', endpoint)
+  console.log('Model Name:', modelName)
+  console.log('Deployment:', deployment)
+  console.log('API Version:', '2024-04-01-preview')
+  console.log('==================================')
   
   // Debug: Log button state
   const isButtonDisabled = loading || !question.trim()
@@ -310,34 +353,14 @@ export default function ChatApp() {
         content: msg.content
       }))
       
-      // Add the current enhanced question
+      // Add system message and conversation history with enhanced question
       const messages = [
+        { role: 'system', content: 'You are a helpful assistant.' },
         ...conversationHistory,
-        {
-          role: 'user' as const,
-          content: enhancedQuestion
-        }
+        { role: 'user', content: enhancedQuestion }
       ]
 
-      const response = await fetch(import.meta.env.VITE_AZURE_OPENAI_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'api-key': import.meta.env.VITE_AZURE_OPENAI_API_KEY
-        },
-        body: JSON.stringify({
-          messages: messages,
-          max_tokens: 1500,
-          temperature: 0.7
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data = await response.json()
-      const aiResponse = data.choices?.[0]?.message?.content || 'No response received'
+      const aiResponse = await callAzureOpenAI(messages)
       
       // Add AI response to conversation
       const assistantMessage: ConversationMessage = {
@@ -426,15 +449,27 @@ export default function ChatApp() {
             }}>
               <BotIcon />
             </Avatar>
-            <Typography 
-              variant="h6" 
-              sx={{ 
-                color: theme.palette.text.primary,
-                fontWeight: 600
-              }}
-            >
-              Workshop Studio AI
-            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+              <Typography 
+                variant="h6" 
+                sx={{ 
+                  color: theme.palette.text.primary,
+                  fontWeight: 600
+                }}
+              >
+                Workshop Studio AI (GPT-5)
+              </Typography>
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  color: theme.palette.text.secondary,
+                  fontSize: '0.7rem',
+                  opacity: 0.7
+                }}
+              >
+                Sweden Central • {deployment}
+              </Typography>
+            </Box>
           </Box>
           
           {conversation.length > 0 && (
@@ -513,7 +548,7 @@ export default function ChatApp() {
                   color="text.secondary"
                   sx={{ maxWidth: 600, lineHeight: 1.6 }}
                 >
-                  Your intelligent assistant for managing projects, tools, entertainment, and more. 
+                  Your intelligent GPT-5 powered assistant for managing projects, tools, entertainment, and more. 
                   Ask me about your shop inventory, Plex library, or any general questions.
                 </Typography>
 
