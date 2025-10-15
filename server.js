@@ -349,6 +349,226 @@ app.get('/api/movie/details', async (req, res) => {
   }
 })
 
+// ============================================
+// Conversation Management Endpoints
+// ============================================
+
+// Get all conversations (for dropdown list)
+app.get('/api/conversations', async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT id, title, created_at, updated_at, message_count, last_message_preview
+      FROM conversations 
+      ORDER BY updated_at DESC
+    `)
+    res.json({ conversations: rows })
+  } catch (error) {
+    console.error('Error fetching conversations:', error)
+    res.status(500).json({ error: 'Failed to fetch conversations' })
+  }
+})
+
+// Get a specific conversation with all its messages
+app.get('/api/conversations/:id', async (req, res) => {
+  try {
+    const conversationId = req.params.id
+    
+    // Get conversation metadata
+    const [conversationRows] = await pool.query(`
+      SELECT id, title, created_at, updated_at, message_count
+      FROM conversations 
+      WHERE id = ?
+    `, [conversationId])
+    
+    if (conversationRows.length === 0) {
+      return res.status(404).json({ error: 'Conversation not found' })
+    }
+    
+    // Get all messages for this conversation
+    const [messageRows] = await pool.query(`
+      SELECT message_id, type, content, timestamp
+      FROM conversation_messages 
+      WHERE conversation_id = ?
+      ORDER BY timestamp ASC
+    `, [conversationId])
+    
+    const conversation = conversationRows[0]
+    const messages = messageRows.map(msg => ({
+      id: msg.message_id,
+      type: msg.type,
+      content: msg.content,
+      timestamp: new Date(msg.timestamp)
+    }))
+    
+    res.json({ 
+      conversation: {
+        id: conversation.id,
+        title: conversation.title,
+        created_at: conversation.created_at,
+        updated_at: conversation.updated_at,
+        message_count: conversation.message_count
+      },
+      messages 
+    })
+  } catch (error) {
+    console.error('Error fetching conversation:', error)
+    res.status(500).json({ error: 'Failed to fetch conversation' })
+  }
+})
+
+// Create a new conversation
+app.post('/api/conversations', async (req, res) => {
+  try {
+    const { title } = req.body
+    const conversationTitle = title || `Conversation ${new Date().toLocaleString()}`
+    
+    const [result] = await pool.query(`
+      INSERT INTO conversations (title, message_count) 
+      VALUES (?, 0)
+    `, [conversationTitle])
+    
+    const conversationId = result.insertId
+    
+    res.json({ 
+      conversation: {
+        id: conversationId,
+        title: conversationTitle,
+        created_at: new Date(),
+        updated_at: new Date(),
+        message_count: 0
+      }
+    })
+  } catch (error) {
+    console.error('Error creating conversation:', error)
+    res.status(500).json({ error: 'Failed to create conversation' })
+  }
+})
+
+// Save/Update conversation messages
+app.post('/api/conversations/:id/messages', async (req, res) => {
+  try {
+    const conversationId = req.params.id
+    const { messages } = req.body
+    
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'Messages array is required' })
+    }
+    
+    // Start transaction
+    const connection = await pool.getConnection()
+    await connection.beginTransaction()
+    
+    try {
+      // Clear existing messages for this conversation
+      await connection.query('DELETE FROM conversation_messages WHERE conversation_id = ?', [conversationId])
+      
+      // Insert all messages
+      for (const message of messages) {
+        // Convert timestamp to MySQL format
+        const mysqlTimestamp = new Date(message.timestamp).toISOString().slice(0, 19).replace('T', ' ')
+        await connection.query(`
+          INSERT INTO conversation_messages (conversation_id, message_id, type, content, timestamp)
+          VALUES (?, ?, ?, ?, ?)
+        `, [conversationId, message.id, message.type, message.content, mysqlTimestamp])
+      }
+      
+      // Update conversation metadata
+      const lastMessage = messages[messages.length - 1]
+      const preview = lastMessage.content.substring(0, 100) + (lastMessage.content.length > 100 ? '...' : '')
+      
+      await connection.query(`
+        UPDATE conversations 
+        SET message_count = ?, last_message_preview = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `, [messages.length, preview, conversationId])
+      
+      await connection.commit()
+      res.json({ success: true, message: 'Conversation saved successfully' })
+    } catch (error) {
+      await connection.rollback()
+      throw error
+    } finally {
+      connection.release()
+    }
+  } catch (error) {
+    console.error('Error saving conversation messages:', error)
+    res.status(500).json({ error: 'Failed to save conversation' })
+  }
+})
+
+// Add a single message to a conversation
+app.post('/api/conversations/:id/message', async (req, res) => {
+  try {
+    const conversationId = req.params.id
+    const { message } = req.body
+    
+    console.log('Received message request:', { conversationId, message })
+    
+    if (!message || !message.id || !message.type || !message.content) {
+      console.log('Invalid message object:', message)
+      return res.status(400).json({ error: 'Valid message object is required' })
+    }
+    
+    // Start transaction
+    const connection = await pool.getConnection()
+    await connection.beginTransaction()
+    
+    try {
+      // Insert the message (convert timestamp to MySQL format)
+      const mysqlTimestamp = new Date(message.timestamp).toISOString().slice(0, 19).replace('T', ' ')
+      await connection.query(`
+        INSERT INTO conversation_messages (conversation_id, message_id, type, content, timestamp)
+        VALUES (?, ?, ?, ?, ?)
+      `, [conversationId, message.id, message.type, message.content, mysqlTimestamp])
+      
+      // Update conversation metadata
+      const [messageCount] = await connection.query(
+        'SELECT COUNT(*) as count FROM conversation_messages WHERE conversation_id = ?',
+        [conversationId]
+      )
+      
+      const preview = message.content.substring(0, 100) + (message.content.length > 100 ? '...' : '')
+      
+      await connection.query(`
+        UPDATE conversations 
+        SET message_count = ?, last_message_preview = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `, [messageCount[0].count, preview, conversationId])
+      
+      await connection.commit()
+      res.json({ success: true, message: 'Message added successfully' })
+    } catch (error) {
+      await connection.rollback()
+      throw error
+    } finally {
+      connection.release()
+    }
+  } catch (error) {
+    console.error('Error adding message:', error)
+    console.error('Error details:', error.message)
+    console.error('Stack trace:', error.stack)
+    res.status(500).json({ error: 'Failed to add message' })
+  }
+})
+
+// Delete a conversation
+app.delete('/api/conversations/:id', async (req, res) => {
+  try {
+    const conversationId = req.params.id
+    
+    const [result] = await pool.query('DELETE FROM conversations WHERE id = ?', [conversationId])
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Conversation not found' })
+    }
+    
+    res.json({ success: true, message: 'Conversation deleted successfully' })
+  } catch (error) {
+    console.error('Error deleting conversation:', error)
+    res.status(500).json({ error: 'Failed to delete conversation' })
+  }
+})
+
 // Test database connection endpoint
 app.get('/api/test', async (req, res) => {
   try {

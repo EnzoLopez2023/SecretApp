@@ -16,19 +16,32 @@ import {
   alpha,
   Tooltip,
   Fab,
-  IconButton
+  IconButton,
+  Select,
+  MenuItem,
+  FormControl,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material'
 import {
   Send as SendIcon,
   Person as PersonIcon,
   SmartToy as BotIcon,
   Clear as ClearIcon,
-  AutoAwesome as SparkleIcon
+  AutoAwesome as SparkleIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  ExpandMore as ExpandMoreIcon
 } from '@mui/icons-material'
 import { AzureOpenAI } from "openai"
 import shopData from './assets/MyShop.json'
 import { isPlexQuestion, generatePlexContext } from './ChatAgent/PlexAgent'
 import MarkdownRenderer from './components/MarkdownRenderer'
+import { ConversationService, type Conversation, type ConversationMessage } from './services/conversationService'
 
 // Azure OpenAI configuration
 const endpoint = "https://enzol-mgr7she7-swedencentral.cognitiveservices.azure.com/";
@@ -267,18 +280,16 @@ const generateShopContext = (question: string): string => {
   return context
 }
 
-// Interface for conversation messages
-interface ConversationMessage {
-  id: string;
-  type: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
+// ConversationMessage interface is now imported from conversationService
 
 export default function ChatApp() {
   const [question, setQuestion] = useState('')
   const [loading, setLoading] = useState(false)
   const [conversation, setConversation] = useState<ConversationMessage[]>([])
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [currentConversationId, setCurrentConversationId] = useState<number | null>(null)
+  const [loadingConversations, setLoadingConversations] = useState(true)
+  const [savingConversation, setSavingConversation] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Debug: Azure OpenAI GPT-5 configuration
@@ -293,10 +304,98 @@ export default function ChatApp() {
   const isButtonDisabled = loading || !question.trim()
   console.log('Button disabled:', isButtonDisabled, 'Loading:', loading, 'Question length:', question.length, 'Question trimmed:', question.trim().length)
 
+  // Load conversations on component mount
+  useEffect(() => {
+    loadConversations()
+  }, [])
+
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [conversation, loading])
+
+  // Auto-save conversation when messages change (debounced)
+  useEffect(() => {
+    if (currentConversationId && conversation.length > 0) {
+      const saveTimer = setTimeout(() => {
+        saveCurrentConversation()
+      }, 2000) // Save 2 seconds after last change
+
+      return () => clearTimeout(saveTimer)
+    }
+  }, [conversation, currentConversationId])
+
+  // Load all conversations
+  const loadConversations = async () => {
+    try {
+      setLoadingConversations(true)
+      const loadedConversations = await ConversationService.getAllConversations()
+      setConversations(loadedConversations)
+      
+      // If no current conversation, create a new one
+      if (!currentConversationId && loadedConversations.length === 0) {
+        await createNewConversation()
+      }
+    } catch (error) {
+      console.error('Failed to load conversations:', error)
+    } finally {
+      setLoadingConversations(false)
+    }
+  }
+
+  // Create a new conversation
+  const createNewConversation = async (title?: string) => {
+    try {
+      const newConversation = await ConversationService.createConversation(title)
+      setCurrentConversationId(newConversation.id)
+      setConversation([])
+      await loadConversations() // Refresh the list
+    } catch (error) {
+      console.error('Failed to create new conversation:', error)
+    }
+  }
+
+  // Load a specific conversation
+  const loadConversation = async (conversationId: number) => {
+    try {
+      const { messages } = await ConversationService.getConversation(conversationId)
+      setCurrentConversationId(conversationId)
+      setConversation(messages)
+    } catch (error) {
+      console.error('Failed to load conversation:', error)
+    }
+  }
+
+  // Save current conversation
+  const saveCurrentConversation = async () => {
+    if (!currentConversationId || conversation.length === 0) return
+
+    try {
+      setSavingConversation(true)
+      await ConversationService.saveConversation(currentConversationId, conversation)
+      await loadConversations() // Refresh to update preview and timestamp
+    } catch (error) {
+      console.error('Failed to save conversation:', error)
+    } finally {
+      setSavingConversation(false)
+    }
+  }
+
+  // Delete a conversation
+  const deleteConversation = async (conversationId: number) => {
+    try {
+      await ConversationService.deleteConversation(conversationId)
+      
+      // If we deleted the current conversation, create a new one
+      if (conversationId === currentConversationId) {
+        await createNewConversation()
+      }
+      
+      await loadConversations()
+    } catch (error) {
+      console.error('Failed to delete conversation:', error)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     console.log('Form submitted, question:', question)
@@ -310,6 +409,16 @@ export default function ChatApp() {
 
     const currentQuestion = question.trim()
     
+    // Create a new conversation if we don't have one
+    let conversationId = currentConversationId
+    if (!conversationId) {
+      const title = ConversationService.generateConversationTitle(currentQuestion)
+      const newConversation = await ConversationService.createConversation(title)
+      conversationId = newConversation.id
+      setCurrentConversationId(conversationId)
+      await loadConversations()
+    }
+
     // Add user message to conversation
     const userMessage: ConversationMessage = {
       id: `user-${Date.now()}`,
@@ -319,6 +428,16 @@ export default function ChatApp() {
     }
     
     setConversation(prev => [...prev, userMessage])
+    
+    // Save user message to database
+    try {
+      console.log('Attempting to save user message:', userMessage)
+      await ConversationService.addMessage(conversationId, userMessage)
+      console.log('User message saved successfully')
+    } catch (error) {
+      console.error('Error saving user message:', error)
+    }
+    
     setQuestion('')
     setLoading(true)
     
@@ -372,6 +491,15 @@ export default function ChatApp() {
       }
       
       setConversation(prev => [...prev, assistantMessage])
+      
+      // Save AI response to database
+      try {
+        console.log('Attempting to save assistant message:', assistantMessage)
+        await ConversationService.addMessage(conversationId, assistantMessage)
+        console.log('Assistant message saved successfully')
+      } catch (error) {
+        console.error('Error saving assistant message:', error)
+      }
     } catch (error) {
       console.error('Error:', error)
       let errorMessage = 'Sorry, there was an error processing your request.'
@@ -399,6 +527,15 @@ export default function ChatApp() {
       }
       
       setConversation(prev => [...prev, errorMessageObj])
+      
+      // Save error message to database
+      try {
+        if (conversationId) {
+          await ConversationService.addMessage(conversationId, errorMessageObj)
+        }
+      } catch (error) {
+        console.error('Error saving error message:', error)
+      }
     } finally {
       setLoading(false)
     }
@@ -441,7 +578,7 @@ export default function ChatApp() {
           borderBottom: `1px solid ${theme.palette.divider}`
         }}
       >
-        <Toolbar sx={{ justifyContent: 'space-between' }}>
+        <Toolbar sx={{ justifyContent: 'space-between', minHeight: '64px !important' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Avatar sx={{ 
               bgcolor: theme.palette.primary.main,
@@ -472,23 +609,91 @@ export default function ChatApp() {
               </Typography>
             </Box>
           </Box>
-          
-          {conversation.length > 0 && (
-            <Tooltip title="Clear conversation">
-              <IconButton 
-                onClick={() => setConversation([])}
-                size="small"
-                sx={{ 
-                  bgcolor: alpha(theme.palette.error.main, 0.1),
-                  '&:hover': {
-                    bgcolor: alpha(theme.palette.error.main, 0.2)
+
+          {/* Conversation Dropdown */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <Select
+                value={currentConversationId?.toString() || 'new'}
+                onChange={(e) => {
+                  const value = e.target.value
+                  if (value === 'new') {
+                    createNewConversation()
+                  } else if (value) {
+                    loadConversation(Number(value))
+                  }
+                }}
+                displayEmpty
+                sx={{
+                  bgcolor: alpha(theme.palette.background.default, 0.8),
+                  '& .MuiSelect-select': {
+                    py: 1,
+                    fontSize: '0.875rem'
                   }
                 }}
               >
-                <ClearIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          )}
+                <MenuItem value="new">
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <AddIcon fontSize="small" />
+                    New Conversation
+                  </Box>
+                </MenuItem>
+                {!loadingConversations && conversations.map((conv) => (
+                  <MenuItem key={conv.id} value={conv.id}>
+                    <Box>
+                      <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>
+                        {conv.title}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {conv.message_count} messages • {new Date(conv.updated_at).toLocaleDateString()}
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* Actions */}
+            <Box sx={{ display: 'flex', gap: 0.5 }}>
+              {savingConversation && (
+                <CircularProgress size={20} sx={{ color: theme.palette.primary.main }} />
+              )}
+              
+              {currentConversationId && (
+                <Tooltip title="Delete conversation">
+                  <IconButton 
+                    onClick={() => deleteConversation(currentConversationId)}
+                    size="small"
+                    sx={{ 
+                      bgcolor: alpha(theme.palette.error.main, 0.1),
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.error.main, 0.2)
+                      }
+                    }}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+
+              {conversation.length > 0 && (
+                <Tooltip title="Clear current conversation">
+                  <IconButton 
+                    onClick={() => createNewConversation()}
+                    size="small"
+                    sx={{ 
+                      bgcolor: alpha(theme.palette.warning.main, 0.1),
+                      '&:hover': {
+                        bgcolor: alpha(theme.palette.warning.main, 0.2)
+                      }
+                    }}
+                  >
+                    <ClearIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Box>
+          </Box>
         </Toolbar>
       </AppBar>
 
