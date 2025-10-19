@@ -175,7 +175,8 @@ export default function WoodworkingProjects() {
     materials: '',                                // Wood types, hardware, etc.
     description: '',                              // Project details
     status: 'planned',
-    files: []
+    files: [],
+    pendingFiles: []                              // Initialize empty pending files
   })
 
   // Load projects
@@ -239,7 +240,8 @@ export default function WoodworkingProjects() {
       materials: '',
       description: '',
       status: 'planned',
-      files: []
+      files: [],
+      pendingFiles: [] // Initialize empty pending files array
     })
     setIsEditing(false)
     setShowForm(true)
@@ -254,8 +256,10 @@ export default function WoodworkingProjects() {
       materials: project.materials || '',
       description: project.description || '',
       status: project.status,
-      files: project.files || []
+      files: project.files || [],
+      pendingFiles: [] // Start with empty pending files when editing
     })
+    setSelectedProject(project) // Set the selected project for reference
     setIsEditing(true)
     setShowForm(true)
     setShowMobileDetails(true)
@@ -284,7 +288,8 @@ export default function WoodworkingProjects() {
       materials: '',
       description: '',
       status: 'planned',
-      files: []
+      files: [],
+      pendingFiles: [] // Clear pending files when canceling
     })
   }
 
@@ -307,10 +312,15 @@ export default function WoodworkingProjects() {
    * - EDIT: Close form without resetting data (preserves original date)
    * - CREATE: Reset form for next entry (sets today's date for new projects)
    * 
+   * FILE UPLOAD INTEGRATION:
+   * Now properly handles pendingFiles by uploading them to the backend
+   * after the project is created or updated.
+   * 
    * LEARNING CONCEPTS:
    * - Form state management in React
    * - Conditional logic based on edit vs create modes
    * - Preventing unwanted state resets
+   * - File upload handling with backend integration
    * - User experience considerations
    * 
    * @param e - Form submission event
@@ -318,8 +328,13 @@ export default function WoodworkingProjects() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
+      let projectId: string
+
       if (isEditing && selectedProject) {
+        // Update existing project
         await projectService.updateProject(selectedProject.id, formData)
+        projectId = selectedProject.id
+        
         // After successful edit, close form but don't reset data until user explicitly cancels
         setShowForm(false)
         setIsEditing(false)
@@ -335,15 +350,70 @@ export default function WoodworkingProjects() {
           status: formData.status || 'planned' as const
         }
         await projectService.createProject(projectData)
+        projectId = projectData.id
+        
         // After creating, we can reset the form for next entry
         handleCancelForm()
       }
+
+      // Handle file uploads if there are pending files
+      if (formData.pendingFiles && formData.pendingFiles.length > 0) {
+        setUploading(true)
+        try {
+          // Convert base64 data back to File objects and upload each one
+          for (const fileData of formData.pendingFiles) {
+            // Convert base64 data URL back to a File object
+            const response = await fetch(fileData.data as string)
+            const blob = await response.blob()
+            const file = new File([blob], fileData.name, { type: fileData.type })
+            
+            // Upload the file using the projectService
+            await projectService.uploadFile(projectId, file)
+          }
+          
+          // Clear pending files after successful upload
+          setFormData(prev => ({ ...prev, pendingFiles: [] }))
+        } catch (uploadError) {
+          console.error('File upload error:', uploadError)
+          setError('Project saved but some file uploads failed')
+        } finally {
+          setUploading(false)
+        }
+      }
+
       await loadProjects()
     } catch (err) {
       setError('Failed to save project')
     }
   }
 
+  /**
+   * File Upload Handler
+   * 
+   * WHAT THIS DOES:
+   * Handles multiple file selection and converts them to base64 for temporary storage.
+   * 
+   * KEY INSIGHT FOR FILE UPLOAD FIX:
+   * Files are stored as "pending" until the form is submitted, then they're
+   * uploaded to the backend. This approach allows users to:
+   * 1. Select files before filling out the form
+   * 2. Preview selected files 
+   * 3. Remove files if needed
+   * 4. Upload all files together when saving the project
+   * 
+   * LEARNING CONCEPTS:
+   * - FileReader API for reading file contents
+   * - Base64 encoding for temporary file storage
+   * - Promise.all for handling multiple async operations
+   * - Form state management with file data
+   * 
+   * FILE FLOW:
+   * 1. User selects files → handleFileUpload (stores as pendingFiles)
+   * 2. User submits form → handleSubmit (uploads pendingFiles to backend)
+   * 3. Backend stores files → files appear in project
+   * 
+   * @param e - File input change event
+   */
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (files.length > 0) {
@@ -755,22 +825,52 @@ export default function WoodworkingProjects() {
                       </Typography>
                     )}
 
+                    {/* Show existing files when editing */}
+                    {isEditing && formData.files && formData.files.length > 0 && (
+                      <Box sx={{ mb: 2 }}>
+                        <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                          Current Files:
+                        </Typography>
+                        <Stack spacing={1}>
+                          {formData.files.map((file: ProjectFile) => (
+                            <Paper key={file.id} sx={{ p: 1, display: 'flex', alignItems: 'center', gap: 1, bgcolor: 'action.hover' }}>
+                              <Paperclip className="w-4 h-4" />
+                              <Typography sx={{ flex: 1 }}>{file.file_name}</Typography>
+                              <Button
+                                size="small"
+                                color="error"
+                                onClick={() => file.id && handleDeleteFile(file.id)}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </Paper>
+                          ))}
+                        </Stack>
+                      </Box>
+                    )}
+
+                    {/* Show pending files (new uploads) */}
                     {formData.pendingFiles && formData.pendingFiles.length > 0 && (
-                      <Stack spacing={1} sx={{ mb: 2 }}>
-                        {formData.pendingFiles.map((file: any, index: number) => (
-                          <Paper key={index} sx={{ p: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Paperclip className="w-4 h-4" />
-                            <Typography sx={{ flex: 1 }}>{file.name}</Typography>
-                            <Button
-                              size="small"
-                              color="error"
-                              onClick={() => removePendingFile(index)}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </Paper>
-                        ))}
-                      </Stack>
+                      <Box sx={{ mb: 2 }}>
+                        <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                          {isEditing ? 'New Files to Upload:' : 'Selected Files:'}
+                        </Typography>
+                        <Stack spacing={1}>
+                          {formData.pendingFiles.map((file: any, index: number) => (
+                            <Paper key={index} sx={{ p: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Paperclip className="w-4 h-4" />
+                              <Typography sx={{ flex: 1 }}>{file.name}</Typography>
+                              <Button
+                                size="small"
+                                color="error"
+                                onClick={() => removePendingFile(index)}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </Paper>
+                          ))}
+                        </Stack>
+                      </Box>
                     )}
                   </Box>
 

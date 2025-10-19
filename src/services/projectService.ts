@@ -22,9 +22,10 @@ export interface ProjectFile {
 
 export interface ProjectFormData extends Partial<WoodworkingProject> {
   pendingFiles?: Array<{
-    file: File
     name: string
     type: string
+    size: number
+    data: string | ArrayBuffer | null
   }>
 }
 
