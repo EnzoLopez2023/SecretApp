@@ -293,11 +293,37 @@ export default function WoodworkingProjects() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
+  /**
+   * Form Submission Handler
+   * 
+   * WHAT THIS DOES:
+   * Handles both creating new projects and updating existing ones.
+   * 
+   * KEY FIX FOR DATE FIELD RESET ISSUE:
+   * Previously, handleCancelForm() was called after every submission,
+   * which reset the date field to today's date even after editing.
+   * Now we handle edit and create scenarios differently:
+   * 
+   * - EDIT: Close form without resetting data (preserves original date)
+   * - CREATE: Reset form for next entry (sets today's date for new projects)
+   * 
+   * LEARNING CONCEPTS:
+   * - Form state management in React
+   * - Conditional logic based on edit vs create modes
+   * - Preventing unwanted state resets
+   * - User experience considerations
+   * 
+   * @param e - Form submission event
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
       if (isEditing && selectedProject) {
         await projectService.updateProject(selectedProject.id, formData)
+        // After successful edit, close form but don't reset data until user explicitly cancels
+        setShowForm(false)
+        setIsEditing(false)
+        setShowMobileDetails(false)
       } else {
         // Create new project data without extra fields
         const projectData = {
@@ -309,9 +335,10 @@ export default function WoodworkingProjects() {
           status: formData.status || 'planned' as const
         }
         await projectService.createProject(projectData)
+        // After creating, we can reset the form for next entry
+        handleCancelForm()
       }
       await loadProjects()
-      handleCancelForm()
     } catch (err) {
       setError('Failed to save project')
     }
