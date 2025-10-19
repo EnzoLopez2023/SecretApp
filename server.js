@@ -1074,6 +1074,19 @@ app.delete('/api/inventory/images/:imageId', async (req, res) => {
 
 const PORT = 3001
 app.listen(PORT, () => {
-  console.log(`🚀 SharePoint API Server running on http://localhost:${PORT}`)
-  console.log(`📊 Test the connection: http://localhost:${PORT}/api/test`)
+  console.log(`🚀 SecretApp Backend Server running on http://localhost:${PORT}`)
+  console.log(``)
+  console.log(`� Available Services:`)
+  console.log(`   🤖 Azure OpenAI Chat: /api/azure-openai/chat`)
+  console.log(`   🎬 Plex Media Proxy: /api/plex/*`)
+  console.log(`   💬 Conversation Management: /api/conversations/*`)
+  console.log(`   🛠️ Workshop Inventory: /api/myshop/*`)
+  console.log(`   📄 SharePoint Integration: /api/sharepoint/*`)
+  console.log(`   🖼️ Image Management: /api/images/*`)
+  console.log(``)
+  console.log(`🔧 Test endpoints:`)
+  console.log(`   📊 Health Check: http://localhost:${PORT}/api/test`)
+  console.log(`   🎭 Plex Library: http://localhost:${PORT}/api/plex/library`)
+  console.log(``)
+  console.log(`✅ Backend ready for SecretApp frontend!`)
 })
