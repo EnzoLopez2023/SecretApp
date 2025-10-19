@@ -48,6 +48,13 @@ SecretApp is a modern, full-stack web application that combines intelligent AI a
 - **User Management**: Role-based access and permissions
 - **Session Management**: Secure token handling
 
+### 🔌 Plex API Client
+- **Bruno-Style Interface**: Professional API testing interface for Plex servers
+- **Pre-configured Endpoints**: Organized categories for library, search, collections, and metadata
+- **JSON Response Viewer**: Syntax-highlighted response display with copy functionality
+- **Input Validation**: Smart parameter handling for complex API calls
+- **Security**: Backend-proxied requests with hidden authentication tokens
+
 ### 📱 Modern User Experience
 - **Responsive Design**: Perfect on mobile, tablet, and desktop
 - **Material Design 3**: Beautiful, consistent UI components

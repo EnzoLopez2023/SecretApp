@@ -66,7 +66,7 @@ import VersionDisplay from './components/VersionDisplay';  // App version info
  * AppView Type - All possible pages in the application
  * This must match the same type definition in App.tsx
  */
-type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter';
+type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter' | 'plex-api';
 
 /**
  * DashboardProps Interface - Defines what props this component receives

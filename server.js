@@ -262,6 +262,32 @@ app.get('/api/plex/playlists', async (req, res) => {
   }
 })
 
+// Get playlist items
+app.get('/api/plex/playlists/:playlistId/items', async (req, res) => {
+  try {
+    const { playlistId } = req.params
+    const url = `${plexConfig.baseUrl}/playlists/${playlistId}/items?X-Plex-Token=${plexConfig.token}`
+
+    const plexResponse = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json'
+      },
+      agent: plexAgent
+    })
+
+    if (!plexResponse.ok) {
+      throw new Error(`Plex playlist items request failed with status ${plexResponse.status}`)
+    }
+
+    const data = await plexResponse.json()
+    res.json(data)
+  } catch (error) {
+    console.error('Plex playlist items fetch error:', error)
+    res.status(500).json({ error: 'Failed to fetch Plex playlist items' })
+  }
+})
+
 // ============================================
 // Plex Collection Management Endpoints
 // ============================================

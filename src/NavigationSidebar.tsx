@@ -21,12 +21,13 @@ import {
   TableChart as ConverterIcon,
   AccountCircle as AccountIcon,
   Logout as LogoutIcon,
+  Api as ApiIcon,
 } from '@mui/icons-material';
 import { useMsal } from '@azure/msal-react';
 
 const drawerWidth = 280;
 
-type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter';
+type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter' | 'plex-api';
 
 interface NavigationSidebarProps {
   currentView: AppView;
@@ -52,6 +53,7 @@ export default function NavigationSidebar({ currentView, onNavigate, showOnDashb
     { id: 'woodworking', label: 'Project Workshop', icon: <CarpenterIcon />, color: '#f59e0b' },
     { id: 'halloween', label: 'Media Library', icon: <MovieIcon />, color: '#ff9800' },
     { id: 'converter', label: 'Data Converter', icon: <ConverterIcon />, color: '#9c27b0' },
+    { id: 'plex-api', label: 'Plex API Client', icon: <ApiIcon />, color: '#e74c3c' },
   ];
 
   // Don't show sidebar on dashboard unless explicitly requested

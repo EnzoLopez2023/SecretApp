@@ -209,7 +209,11 @@ export const extractPlaylistDetails = (question: string): {
   let searchTerm = ''
   
   // Look for patterns like "Iron Man movies", "Marvel movies", "Batman films"
+  // Order matters - more specific patterns first!
   const searchPatterns = [
+    /(?:on the whole )([^,]+?)(?:\s+(?:series|movies|films))/i,                    // "on the whole [Series Name] series"
+    /(?:whole )([^,]+?)(?:\s+(?:series|movies|films))/i,                          // "whole [Series Name] series"  
+    /(?:playlist (?:of|with|containing|from [^,]*on the whole) )([^,]+?)(?:\s+(?:movies|films|shows|series))/i,
     /(?:playlist (?:of|with|containing) )([^,]+?)(?:\s+(?:movies|films|shows))/i,
     /(?:playlist (?:of|with|containing) )([^,]+)/i,
     /(?:called '[^']+' with )([^,]+)/i,
@@ -242,7 +246,21 @@ export const extractPlaylistDetails = (question: string): {
   
   // If no explicit name, generate one from search term
   if (!playlistName && searchTerm) {
-    playlistName = `${searchTerm} Collection`
+    // Make the playlist name more natural based on common movie series/franchises
+    if (searchTerm.toLowerCase().includes('conjuring')) {
+      playlistName = `The Conjuring Universe`
+    } else if (searchTerm.toLowerCase().includes('marvel')) {
+      playlistName = `Marvel Movies`
+    } else if (searchTerm.toLowerCase().includes('batman')) {
+      playlistName = `Batman Collection`
+    } else if (searchTerm.toLowerCase().includes('john wick')) {
+      playlistName = `John Wick Series`
+    } else if (searchTerm.toLowerCase().includes('mission impossible')) {
+      playlistName = `Mission Impossible Collection`
+    } else {
+      // Generic format for any movie series or actor
+      playlistName = `${searchTerm} Collection`
+    }
   }
   
   // Determine ordering preference
@@ -500,8 +518,9 @@ export const createPlexPlaylist = async (
       }
     }
 
-    // Create URI string for multiple movies
-    const uri = movieKeys.map(key => `server://your-plex-server/com.plexapp.plugins.library/library/metadata/${key}`).join(',')
+    // Create URI string for multiple movies - use library metadata format
+    // Based on your playlist data, URIs should be: /library/metadata/{key}
+    const uri = movieKeys.map(key => `/library/metadata/${key}`).join(',')
 
     const addResponse = await fetch(`${apiBaseUrl}/plex/playlists/${playlistId}/items`, {
       method: 'PUT',
@@ -1358,8 +1377,8 @@ export const createPlexCollection = async (
       }
     }
 
-    // Create URI string for multiple movies
-    const uri = movieKeys.map(key => `server://your-plex-server/com.plexapp.plugins.library/library/metadata/${key}`).join(',')
+    // Create URI string for multiple movies - use library metadata format
+    const uri = movieKeys.map(key => `/library/metadata/${key}`).join(',')
 
     const addResponse = await fetch(`${apiBaseUrl}/plex/collections/${collectionId}/items`, {
       method: 'PUT',
