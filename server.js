@@ -8,6 +8,14 @@ const app = express()
 app.use(cors())
 app.use(express.json({ limit: '50mb' }))
 
+// Azure OpenAI configuration (secure backend-only)
+const azureOpenAIConfig = {
+  endpoint: process.env.AZURE_OPENAI_ENDPOINT || 'https://enzol-mgr7she7-swedencentral.cognitiveservices.azure.com/',
+  apiKey: process.env.AZURE_OPENAI_API_KEY || 'CMAJXHUEw8cWYiD6bd6UhnjIqxYLO7FngHwiuIOkpRjcIABZKVBxJQQJ99BJACfhMk5XJ3w3AAAAACOGxNoa',
+  apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-04-01-preview',
+  deployment: process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5-chat'
+}
+
 // Plex configuration (proxied to avoid CORS and certificate issues)
 const plexConfig = {
   baseUrl: process.env.PLEX_BASE_URL || 'https://plex.enzolopez.net:32400',
@@ -26,6 +34,57 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
+})
+
+// ============================================
+// Azure OpenAI Proxy Endpoint (Secure)
+// ============================================
+
+app.post('/api/azure-openai/chat', async (req, res) => {
+  try {
+    const { messages } = req.body
+    
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: 'Messages array is required' })
+    }
+
+    // Construct the Azure OpenAI API URL
+    const url = `${azureOpenAIConfig.endpoint}openai/deployments/${azureOpenAIConfig.deployment}/chat/completions?api-version=${azureOpenAIConfig.apiVersion}`
+    
+    // Make the request to Azure OpenAI
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': azureOpenAIConfig.apiKey
+      },
+      body: JSON.stringify({
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 2000,
+        top_p: 0.95,
+        frequency_penalty: 0,
+        presence_penalty: 0,
+        stream: false
+      })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Azure OpenAI API error:', response.status, errorText)
+      return res.status(response.status).json({ 
+        error: 'Azure OpenAI API request failed',
+        details: errorText 
+      })
+    }
+
+    const data = await response.json()
+    res.json(data)
+
+  } catch (error) {
+    console.error('Azure OpenAI proxy error:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
 })
 
 // ============================================

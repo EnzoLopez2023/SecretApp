@@ -72,7 +72,8 @@ import {
 } from '@mui/icons-material'
 
 // Import Azure OpenAI client for AI functionality
-import { AzureOpenAI } from "openai"
+// NOTE: We no longer import AzureOpenAI directly - we use our backend API instead
+// import { AzureOpenAI } from "openai"
 
 // Import local data and services
 import shopData from './assets/MyShop.json'  // Woodworking shop data
@@ -80,79 +81,74 @@ import { isPlexQuestion, generatePlexContext } from './ChatAgent/PlexAgent'  // 
 import MarkdownRenderer from './components/MarkdownRenderer'  // For formatting AI responses
 import { ConversationService, type Conversation, type ConversationMessage } from './services/conversationService'  // Database operations
 
-// Azure OpenAI configuration - connects to your AI service
-const endpoint = "https://enzol-mgr7she7-swedencentral.cognitiveservices.azure.com/";
+// Configuration for the chat model
 const modelName = "gpt-5-chat";
 const deployment = "gpt-5-chat";
 
 /**
- * Azure OpenAI API Call Function
+ * Azure OpenAI API Call Function (Secure Backend Version)
  * 
  * WHAT THIS FUNCTION DOES:
- * This function sends your conversation to Azure OpenAI and gets an AI response back.
- * It's like having a phone call with a very smart assistant.
+ * This function sends your conversation to Azure OpenAI via our secure backend.
+ * The backend handles all the sensitive API keys and configuration.
  * 
  * HOW IT WORKS:
  * 1. Takes an array of messages (your conversation history)
- * 2. Sends them to Azure OpenAI's GPT-5 model
- * 3. Gets back an AI-generated response
- * 4. Returns that response to display in the chat
+ * 2. Sends them to our backend API endpoint
+ * 3. Backend securely calls Azure OpenAI's GPT-5 model
+ * 4. Returns the AI-generated response to display in the chat
  * 
  * LEARNING CONCEPTS:
- * - Async/await for handling promises
- * - API authentication with keys
+ * - Secure API architecture (sensitive data on backend)
+ * - Fetch API for HTTP requests
  * - Error handling with try/catch
- * - Working with external AI services
- * - HTTP requests and responses
+ * - JSON data parsing
+ * - RESTful API communication
  * 
- * SECURITY NOTE FOR STUDENTS:
- * In a real production app, you would NEVER put API keys directly in frontend code!
- * This should be handled by your backend server. We're doing it here for simplicity.
+ * SECURITY IMPROVEMENT:
+ * This is much more secure than the previous version! API keys are now
+ * safely stored on the backend server instead of exposed in frontend code.
  * 
  * @param messages - Array of conversation messages to send to AI
  * @returns Promise that resolves to the AI's response
  */
 export async function callAzureOpenAI(messages: Array<{role: string, content: string}>) {
-  // WARNING: In production, this API key should be on the backend!
-  const apiKey = "CMAJXHUEw8cWYiD6bd6UhnjIqxYLO7FngHwiuIOkpRjcIABZKVBxJQQJ99BJACfhMk5XJ3w3AAAAACOGxNoa";
-  const apiVersion = "2024-04-01-preview";
-  
-  // Configuration object for the Azure OpenAI client
-  const options = { 
-    endpoint,     // Where to send the request
-    apiKey,       // Authentication key
-    deployment,   // Which AI model to use
-    apiVersion,   // Which version of the API
-    dangerouslyAllowBrowser: true  // Allows running in browser (normally unsafe)
+  try {
+    // Log what we're sending (helpful for debugging)
+    console.log('🔧 Making secure API call to backend with:', {
+      deployment: deployment,
+      model: modelName,
+      messageCount: messages.length
+    });
+
+    // Make a POST request to our secure backend endpoint
+    const response = await fetch('/api/azure-openai/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        messages: messages
+      })
+    });
+
+    // Check if the request was successful
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(`Backend API error: ${response.status} - ${errorData.error || 'Unknown error'}`);
+    }
+
+    // Parse the JSON response from our backend
+    const data = await response.json();
+    
+    // Extract the AI's response from the API response
+    // The ?. is "optional chaining" - safely access properties that might not exist
+    return data.choices[0]?.message?.content || 'No response received';
+
+  } catch (error) {
+    console.error('❌ Error calling Azure OpenAI via backend:', error);
+    throw new Error(`Failed to get AI response: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-
-  // Log what we're sending (helpful for debugging)
-  console.log('🔧 Making API call with:', {
-    endpoint: endpoint,
-    deployment: deployment,
-    model: modelName,
-    apiVersion: apiVersion
-  });
-
-  // Create the Azure OpenAI client with our configuration
-  const client = new AzureOpenAI(options);
-
-  // Make the actual API call to get AI response
-  const response = await client.chat.completions.create({
-    // Convert our message format to what OpenAI expects
-    messages: messages.map(msg => ({
-      role: msg.role as "system" | "user" | "assistant",  // TypeScript type assertion
-      content: msg.content
-    })),
-    max_tokens: 16384,    // Maximum length of response
-    temperature: 1,       // Creativity level (0 = very focused, 2 = very creative)
-    top_p: 1,            // Another parameter that affects randomness
-    model: modelName     // Which AI model to use
-  });
-
-  // Extract the AI's response from the API response
-  // The ?. is "optional chaining" - safely access properties that might not exist
-  return response.choices[0]?.message?.content || 'No response received';
 }
 
 // ================================================================================================
@@ -475,12 +471,11 @@ export default function ChatApp() {
   // DEBUG LOGGING - Help us understand what's happening
   // ============================================================================================
   
-  console.log('=== Azure OpenAI Configuration ===')
-  console.log('Endpoint:', endpoint)
+  console.log('=== Azure OpenAI Configuration (Backend) ===')
   console.log('Model Name:', modelName)
   console.log('Deployment:', deployment)
-  console.log('API Version:', '2024-04-01-preview')
-  console.log('==================================')
+  console.log('Backend API:', '/api/azure-openai/chat')
+  console.log('===========================================')
   
   // Calculate if send button should be disabled
   const isButtonDisabled = loading || !question.trim()
