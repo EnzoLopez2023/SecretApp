@@ -155,6 +155,114 @@ export const isMovieDetailQuestion = (question: string): boolean => {
   return movieDetailKeywords.some(keyword => lowerQuestion.includes(keyword))
 }
 
+/**
+ * Detects if a question is asking to create a playlist
+ * 
+ * PURPOSE: Identifies when users want to create playlists like:
+ * - "Create a playlist of Iron Man movies"
+ * - "Make a Marvel playlist"
+ * - "Create a playlist with all Batman movies in order"
+ * 
+ * LEARNING CONCEPTS:
+ * - Pattern recognition for user intent detection
+ * - Regular expressions for complex pattern matching
+ * - Action detection vs information queries
+ * 
+ * @param question - The user's question
+ * @returns true if the question asks to create a playlist
+ */
+export const isPlaylistCreationRequest = (question: string): boolean => {
+  const playlistKeywords = [
+    'create playlist', 'make playlist', 'playlist of', 'playlist with', 'playlist containing',
+    'create a playlist', 'make a playlist', 'build playlist', 'generate playlist',
+    'playlist for', 'new playlist'
+  ]
+  
+  const lowerQuestion = question.toLowerCase()
+  return playlistKeywords.some(keyword => lowerQuestion.includes(keyword))
+}
+
+/**
+ * Extracts playlist details from a user's request
+ * 
+ * PURPOSE: Parses playlist creation requests to extract:
+ * - What movies/shows to include
+ * - Desired playlist name
+ * - Any ordering requirements
+ * 
+ * EXAMPLE INPUTS:
+ * - "Create a playlist of Iron Man movies in chronological order"
+ * - "Make a Marvel playlist with all Avengers movies"
+ * - "Create a playlist called 'Action Movies' with John Wick and Mission Impossible"
+ * 
+ * @param question - The user's playlist creation request
+ * @returns Object with playlist details
+ */
+export const extractPlaylistDetails = (question: string): {
+  searchTerm: string
+  playlistName: string
+  orderBy: 'chronological' | 'alphabetical' | 'release' | 'none'
+} => {
+  const lowerQuestion = question.toLowerCase()
+  
+  // Extract search term (what movies/shows to find)
+  let searchTerm = ''
+  
+  // Look for patterns like "Iron Man movies", "Marvel movies", "Batman films"
+  const searchPatterns = [
+    /(?:playlist (?:of|with|containing) )([^,]+?)(?:\s+(?:movies|films|shows))/i,
+    /(?:playlist (?:of|with|containing) )([^,]+)/i,
+    /(?:called '[^']+' with )([^,]+)/i,
+    /(?:called "[^"]+" with )([^,]+)/i
+  ]
+  
+  for (const pattern of searchPatterns) {
+    const match = question.match(pattern)
+    if (match) {
+      searchTerm = match[1].trim()
+      break
+    }
+  }
+  
+  // Extract playlist name if specified
+  let playlistName = ''
+  const namePatterns = [
+    /(?:playlist called|called) '([^']+)'/i,
+    /(?:playlist called|called) "([^"]+)"/i,
+    /(?:playlist called|called) ([^,\s]+)/i
+  ]
+  
+  for (const pattern of namePatterns) {
+    const match = question.match(pattern)
+    if (match) {
+      playlistName = match[1].trim()
+      break
+    }
+  }
+  
+  // If no explicit name, generate one from search term
+  if (!playlistName && searchTerm) {
+    playlistName = `${searchTerm} Collection`
+  }
+  
+  // Determine ordering preference
+  let orderBy: 'chronological' | 'alphabetical' | 'release' | 'none' = 'none'
+  
+  if (lowerQuestion.includes('chronological') || lowerQuestion.includes('in order')) {
+    orderBy = 'chronological'
+  } else if (lowerQuestion.includes('alphabetical') || lowerQuestion.includes('a-z')) {
+    orderBy = 'alphabetical'
+  } else if (lowerQuestion.includes('release date') || lowerQuestion.includes('release order')) {
+    orderBy = 'release'
+  }
+  
+  return {
+    searchTerm,
+    playlistName,
+    orderBy
+  }
+}
+
 // ================================================================================================
 // API COMMUNICATION FUNCTIONS - These talk to external services
 // ================================================================================================
@@ -285,6 +393,146 @@ export const fetchMovieDetails = async (movieTitle: string, year?: number, apiBa
   } catch (error) {
     console.error('Error fetching movie details:', error)
     return null
+  }
+}
+
+/**
+ * Creates a Plex playlist with specified movies
+ * 
+ * WHAT THIS DOES:
+ * 1. Searches for movies matching the criteria
+ * 2. Creates a new playlist in Plex
+ * 3. Adds found movies to the playlist in specified order
+ * 4. Returns confirmation with details
+ * 
+ * EXAMPLE USAGE:
+ * await createPlexPlaylist("Iron Man", "MCU Iron Man Movies", "chronological", apiBaseUrl)
+ * 
+ * LEARNING CONCEPTS:
+ * - API integration for create operations (not just read)
+ * - Data transformation and sorting
+ * - User confirmation and feedback
+ * - Error handling for complex operations
+ * 
+ * @param searchTerm - What to search for (e.g., "Iron Man")
+ * @param playlistName - Name for the new playlist
+ * @param orderBy - How to order the movies
+ * @param apiBaseUrl - API endpoint
+ * @returns Promise with playlist creation result
+ */
+export const createPlexPlaylist = async (
+  searchTerm: string,
+  playlistName: string,
+  orderBy: 'chronological' | 'alphabetical' | 'release' | 'none',
+  apiBaseUrl: string
+): Promise<{
+  success: boolean
+  message: string
+  playlistId?: string
+  moviesAdded: number
+  movieTitles: string[]
+}> => {
+  try {
+    // Step 1: Search for movies matching the criteria
+    console.log(`🎬 Searching for movies matching: "${searchTerm}"`)
+    const searchResponse = await searchPlexMovies(searchTerm, apiBaseUrl)
+    
+    if (!searchResponse || !searchResponse.movies || searchResponse.movies.length === 0) {
+      return {
+        success: false,
+        message: `No movies found matching "${searchTerm}". Please check the spelling or try a different search term.`,
+        moviesAdded: 0,
+        movieTitles: []
+      }
+    }
+
+    let movies = searchResponse.movies
+    
+    // Step 2: Sort movies based on user preference
+    switch (orderBy) {
+      case 'alphabetical':
+        movies = movies.sort((a, b) => a.title.localeCompare(b.title))
+        break
+      case 'release':
+      case 'chronological':
+        movies = movies.sort((a, b) => (a.year || 0) - (b.year || 0))
+        break
+      case 'none':
+      default:
+        // Keep original order from search
+        break
+    }
+
+    // Step 3: Create the playlist
+    console.log(`📝 Creating playlist: "${playlistName}"`)
+    const createResponse = await fetch(`${apiBaseUrl}/plex/playlists`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        title: playlistName,
+        type: 'video'
+      })
+    })
+
+    if (!createResponse.ok) {
+      throw new Error(`Failed to create playlist: ${createResponse.status}`)
+    }
+
+    const playlistData = await createResponse.json()
+    const playlistId = playlistData.MediaContainer?.Metadata?.[0]?.ratingKey
+
+    if (!playlistId) {
+      throw new Error('Created playlist but could not get playlist ID')
+    }
+
+    // Step 4: Add movies to the playlist
+    console.log(`➕ Adding ${movies.length} movies to playlist`)
+    const movieKeys = movies.map(movie => movie.key).filter(key => key)
+    
+    if (movieKeys.length === 0) {
+      return {
+        success: false,
+        message: 'Found movies but could not get their IDs for playlist creation.',
+        moviesAdded: 0,
+        movieTitles: []
+      }
+    }
+
+    // Create URI string for multiple movies
+    const uri = movieKeys.map(key => `server://your-plex-server/com.plexapp.plugins.library/library/metadata/${key}`).join(',')
+
+    const addResponse = await fetch(`${apiBaseUrl}/plex/playlists/${playlistId}/items`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ uri })
+    })
+
+    if (!addResponse.ok) {
+      throw new Error(`Failed to add movies to playlist: ${addResponse.status}`)
+    }
+
+    const movieTitles = movies.map(movie => movie.title)
+    
+    return {
+      success: true,
+      message: `Successfully created playlist "${playlistName}" with ${movies.length} movies!`,
+      playlistId,
+      moviesAdded: movies.length,
+      movieTitles
+    }
+
+  } catch (error) {
+    console.error('❌ Playlist creation error:', error)
+    return {
+      success: false,
+      message: `Failed to create playlist: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      moviesAdded: 0,
+      movieTitles: []
+    }
   }
 }
 
@@ -458,6 +706,49 @@ export const generatePlexContext = async (question: string, apiBaseUrl: string):
           // FAILURE: Couldn't get movie details, but that's okay
           context += `\n⚠️ Could not fetch detailed information for "${movieTitle}" from external sources.\n`
         }
+      }
+    }
+    
+    // ============================================================================================
+    // STEP 1.5: Handle Playlist Creation Requests
+    // ============================================================================================
+    
+    // Check if this is a playlist creation request
+    if (isPlaylistCreationRequest(question)) {
+      console.log(`📝 Detected playlist creation request`)
+      
+      // Extract playlist details from the question
+      const playlistDetails = extractPlaylistDetails(question)
+      
+      if (playlistDetails.searchTerm) {
+        console.log(`🔍 Creating playlist: "${playlistDetails.playlistName}" with search term: "${playlistDetails.searchTerm}"`)
+        
+        // Create confirmation message for user
+        const confirmationMessage = `
+🎵 PLAYLIST CREATION REQUEST DETECTED
+
+I can help you create a Plex playlist with the following details:
+📝 Playlist Name: "${playlistDetails.playlistName}"
+🔍 Search Term: "${playlistDetails.searchTerm}"
+📋 Order: ${playlistDetails.orderBy}
+
+To proceed with creating this playlist, I need your confirmation.
+Would you like me to:
+
+1. Search your Plex library for movies matching "${playlistDetails.searchTerm}"
+2. Create a new playlist called "${playlistDetails.playlistName}"
+3. Add the found movies in ${playlistDetails.orderBy === 'none' ? 'default' : playlistDetails.orderBy} order
+
+Please respond with "Yes, create the playlist" to proceed, or let me know if you'd like to modify any details.
+
+Note: This will actually create a playlist in your Plex server. The playlist will appear in all your Plex apps and can be accessed by other users with access to your server.
+`
+        
+        context += confirmationMessage
+        return context
+      } else {
+        context += `\n⚠️ I detected a playlist creation request, but couldn't determine what movies to include. Please specify what you'd like in the playlist (e.g., "Create a playlist of Marvel movies" or "Make a playlist with all Batman films").\n`
+        return context
       }
     }
     
@@ -666,6 +957,105 @@ export const handlePlexQuestion = async (question: string, apiBaseUrl: string): 
   return question + plexContext
 }
 
+/**
+ * Handles playlist creation confirmation and execution
+ * 
+ * WHAT THIS DOES:
+ * When a user confirms they want to create a playlist, this function:
+ * 1. Detects confirmation responses
+ * 2. Retrieves the previous playlist request details
+ * 3. Actually creates the playlist
+ * 4. Returns status and results
+ * 
+ * CONFIRMATION PATTERNS:
+ * - "Yes, create the playlist"
+ * - "Yes" (if in playlist context)
+ * - "Create it"
+ * - "Make the playlist"
+ * 
+ * @param question - User's response
+ * @param previousContext - Previous conversation context with playlist details
+ * @param apiBaseUrl - API endpoint
+ * @returns Promise with execution result
+ */
+export const executePlaylistCreation = async (
+  question: string,
+  searchTerm: string,
+  playlistName: string,
+  orderBy: 'chronological' | 'alphabetical' | 'release' | 'none',
+  apiBaseUrl: string
+): Promise<string> => {
+  const lowerQuestion = question.toLowerCase()
+  
+  // Check if user is confirming playlist creation
+  const confirmationPatterns = [
+    'yes, create the playlist',
+    'yes create',
+    'create it',
+    'make the playlist',
+    'go ahead',
+    'proceed',
+    'do it',
+    /^yes[,.]?\s*(please)?$/
+  ]
+  
+  const isConfirmation = confirmationPatterns.some(pattern => {
+    if (typeof pattern === 'string') {
+      return lowerQuestion.includes(pattern)
+    } else {
+      return pattern.test(lowerQuestion)
+    }
+  })
+  
+  if (isConfirmation) {
+    console.log(`✅ User confirmed playlist creation`)
+    
+    // Actually create the playlist
+    const result = await createPlexPlaylist(searchTerm, playlistName, orderBy, apiBaseUrl)
+    
+    if (result.success) {
+      return `
+🎉 SUCCESS! Playlist Created Successfully!
+
+📝 Playlist Name: "${playlistName}"
+🎬 Movies Added: ${result.moviesAdded}
+📋 Order: ${orderBy === 'none' ? 'Default' : orderBy}
+
+🍿 Movies in your playlist:
+${result.movieTitles.map((title, index) => `${index + 1}. ${title}`).join('\n')}
+
+✅ The playlist has been added to your Plex server and should be visible in all your Plex apps shortly.
+
+You can find it in the "Playlists" section of your Plex library. Enjoy your curated movie collection! 🎬
+`
+    } else {
+      return `
+❌ Playlist Creation Failed
+
+${result.message}
+
+You can try:
+- Checking the spelling of the search term
+- Using a broader search term (e.g., "Marvel" instead of "Marvel Cinematic Universe")
+- Making sure you have movies matching the criteria in your Plex library
+
+Would you like to try again with different criteria?
+`
+    }
+  } else {
+    return `
+🤔 I didn't understand your response.
+
+To create the playlist, please respond with:
+- "Yes, create the playlist"
+- "Yes"
+- "Create it"
+
+To cancel or modify the request, just let me know what you'd like to change.
+`
+  }
+}
+
 // ================================================================================================
 // EXPORTS - Making functions available to other files
 // ================================================================================================
@@ -682,6 +1072,10 @@ export const handlePlexQuestion = async (question: string, apiBaseUrl: string): 
 export default {
   isPlexQuestion,
   isMovieDetailQuestion,
+  isPlaylistCreationRequest,
+  extractPlaylistDetails,
+  createPlexPlaylist,
+  executePlaylistCreation,
   fetchPlexStats,
   searchPlexMovies,
   fetchMovieDetails,

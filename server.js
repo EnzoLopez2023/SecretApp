@@ -161,6 +161,108 @@ app.get('/api/plex/image', async (req, res) => {
 })
 
 // ============================================
+// Plex Playlist Management Endpoints
+// ============================================
+
+// Create a new playlist
+app.post('/api/plex/playlists', async (req, res) => {
+  try {
+    const { title, type = 'video', smart = 0, uri } = req.body
+    
+    if (!title) {
+      return res.status(400).json({ error: 'Playlist title is required' })
+    }
+
+    // Build the playlist creation URL
+    const createUrl = `${plexConfig.baseUrl}/playlists?X-Plex-Token=${plexConfig.token}`
+    
+    // Prepare form data for playlist creation
+    const formData = new URLSearchParams()
+    formData.append('title', title)
+    formData.append('type', type)
+    formData.append('smart', smart.toString())
+    if (uri) {
+      formData.append('uri', uri)
+    }
+
+    const plexResponse = await fetch(createUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: formData,
+      agent: plexAgent
+    })
+
+    if (!plexResponse.ok) {
+      const errorText = await plexResponse.text()
+      console.error('Plex playlist creation failed:', plexResponse.status, errorText)
+      throw new Error(`Plex playlist creation failed with status ${plexResponse.status}`)
+    }
+
+    const data = await plexResponse.json()
+    res.json(data)
+  } catch (error) {
+    console.error('Plex playlist creation error:', error)
+    res.status(500).json({ error: 'Failed to create Plex playlist' })
+  }
+})
+
+// Add items to a playlist
+app.put('/api/plex/playlists/:playlistId/items', async (req, res) => {
+  try {
+    const { playlistId } = req.params
+    const { uri } = req.body
+    
+    if (!uri) {
+      return res.status(400).json({ error: 'URI is required to add items to playlist' })
+    }
+
+    const addUrl = `${plexConfig.baseUrl}/playlists/${playlistId}/items?uri=${encodeURIComponent(uri)}&X-Plex-Token=${plexConfig.token}`
+
+    const plexResponse = await fetch(addUrl, {
+      method: 'PUT',
+      agent: plexAgent
+    })
+
+    if (!plexResponse.ok) {
+      throw new Error(`Failed to add items to playlist with status ${plexResponse.status}`)
+    }
+
+    const data = await plexResponse.json()
+    res.json(data)
+  } catch (error) {
+    console.error('Plex playlist add items error:', error)
+    res.status(500).json({ error: 'Failed to add items to Plex playlist' })
+  }
+})
+
+// Get all playlists
+app.get('/api/plex/playlists', async (req, res) => {
+  try {
+    const url = `${plexConfig.baseUrl}/playlists?X-Plex-Token=${plexConfig.token}`
+
+    const plexResponse = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json'
+      },
+      agent: plexAgent
+    })
+
+    if (!plexResponse.ok) {
+      throw new Error(`Plex playlists request failed with status ${plexResponse.status}`)
+    }
+
+    const data = await plexResponse.json()
+    res.json(data)
+  } catch (error) {
+    console.error('Plex playlists fetch error:', error)
+    res.status(500).json({ error: 'Failed to fetch Plex playlists' })
+  }
+})
+
+// ============================================
 // Plex Library Information Endpoints
 // ============================================
 

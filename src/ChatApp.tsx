@@ -68,7 +68,9 @@ import {
   Clear as ClearIcon,       // Clear/X icon
   AutoAwesome as SparkleIcon, // Sparkle/magic icon
   Add as AddIcon,           // Plus/add icon
-  Delete as DeleteIcon      // Trash/delete icon
+  Delete as DeleteIcon,     // Trash/delete icon
+  Check as CheckIcon,       // Checkmark icon for confirmation
+  Close as CloseIcon        // Close/X icon for cancellation
 } from '@mui/icons-material'
 
 // Import Azure OpenAI client for AI functionality
@@ -77,7 +79,7 @@ import {
 
 // Import local data and services
 import shopData from './assets/MyShop.json'  // Woodworking shop data
-import { isPlexQuestion, generatePlexContext } from './ChatAgent/PlexAgent'  // Plex intelligence
+import { isPlexQuestion, generatePlexContext, isPlaylistCreationRequest, extractPlaylistDetails, executePlaylistCreation } from './ChatAgent/PlexAgent'  // Plex intelligence
 import MarkdownRenderer from './components/MarkdownRenderer'  // For formatting AI responses
 import { ConversationService, type Conversation, type ConversationMessage } from './services/conversationService'  // Database operations
 
@@ -464,6 +466,11 @@ export default function ChatApp() {
   // Whether we're saving current conversation
   const [savingConversation, setSavingConversation] = useState(false)
   
+  // Playlist creation workflow state
+  const [pendingPlaylistDetails, setPendingPlaylistDetails] = useState<any>(null)
+  const [showPlaylistConfirmation, setShowPlaylistConfirmation] = useState(false)
+  const [creatingPlaylist, setCreatingPlaylist] = useState(false)
+  
   // Reference to the bottom of messages (for auto-scrolling)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -621,6 +628,18 @@ export default function ChatApp() {
 
     const currentQuestion = question.trim()
     
+    // Check if this is a response to playlist confirmation
+    if (showPlaylistConfirmation) {
+      const isConfirmation = /^(yes|y|yeah|sure|ok|okay|proceed|go ahead|create it|do it)$/i.test(currentQuestion) ||
+                           /^(no|n|nope|cancel|don't|dont|nevermind|never mind)$/i.test(currentQuestion)
+      
+      if (isConfirmation) {
+        const confirmed = /^(yes|y|yeah|sure|ok|okay|proceed|go ahead|create it|do it)$/i.test(currentQuestion)
+        await handlePlaylistConfirmation(confirmed, currentQuestion)
+        return
+      }
+    }
+    
     // Create a new conversation if we don't have one
     let conversationId = currentConversationId
     if (!conversationId) {
@@ -671,6 +690,33 @@ export default function ChatApp() {
       if (isPlexQuestion(currentQuestion)) {
         const plexContext = await generatePlexContext(currentQuestion, apiBaseUrl)
         enhancedQuestion = currentQuestion + plexContext
+      }
+      
+      // Check for playlist creation requests
+      if (isPlaylistCreationRequest(currentQuestion)) {
+        const playlistDetails = extractPlaylistDetails(currentQuestion)
+        setPendingPlaylistDetails(playlistDetails)
+        setShowPlaylistConfirmation(true)
+        setLoading(false)
+        
+        // Add confirmation message to conversation
+        const confirmationMessage: ConversationMessage = {
+          id: `assistant-${Date.now()}`,
+          type: 'assistant',
+          content: `I can create a playlist "${playlistDetails.playlistName}" with movies matching "${playlistDetails.searchTerm}". Would you like me to proceed?`,
+          timestamp: new Date()
+        }
+        
+        setConversation(prev => [...prev, confirmationMessage])
+        
+        // Save confirmation message to database
+        try {
+          await ConversationService.addMessage(conversationId, confirmationMessage)
+        } catch (error) {
+          console.error('Error saving confirmation message:', error)
+        }
+        
+        return // Exit here to wait for user confirmation
       }
     } catch (error) {
       console.error('Error generating context:', error)
@@ -751,6 +797,87 @@ export default function ChatApp() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Handle playlist creation confirmation
+  const handlePlaylistConfirmation = async (confirmed: boolean, userResponse: string) => {
+    if (!pendingPlaylistDetails || !currentConversationId) return
+    
+    // Add user's confirmation response to conversation
+    const userMessage: ConversationMessage = {
+      id: `user-${Date.now()}`,
+      type: 'user',
+      content: userResponse,
+      timestamp: new Date()
+    }
+    
+    setConversation(prev => [...prev, userMessage])
+    
+    try {
+      await ConversationService.addMessage(currentConversationId, userMessage)
+    } catch (error) {
+      console.error('Error saving user response:', error)
+    }
+
+    if (confirmed) {
+      setCreatingPlaylist(true)
+      
+      try {
+        // Get API base URL
+        const configuredBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '')
+        const apiBaseUrl = configuredBase || (import.meta.env.DEV ? 'http://localhost:3001/api' : `${window.location.origin}/api`)
+        
+        const result = await executePlaylistCreation(
+          userResponse,
+          pendingPlaylistDetails.searchTerm,
+          pendingPlaylistDetails.playlistName,
+          pendingPlaylistDetails.orderBy || 'chronological',
+          apiBaseUrl
+        )
+        
+        // Add success message to conversation
+        const successMessage: ConversationMessage = {
+          id: `assistant-${Date.now()}`,
+          type: 'assistant',
+          content: result,
+          timestamp: new Date()
+        }
+        
+        setConversation(prev => [...prev, successMessage])
+        await ConversationService.addMessage(currentConversationId, successMessage)
+        
+      } catch (error) {
+        console.error('Error creating playlist:', error)
+        
+        // Add error message to conversation
+        const errorMessage: ConversationMessage = {
+          id: `assistant-${Date.now()}`,
+          type: 'assistant',
+          content: `Sorry, I encountered an error creating the playlist: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          timestamp: new Date()
+        }
+        
+        setConversation(prev => [...prev, errorMessage])
+        await ConversationService.addMessage(currentConversationId, errorMessage)
+      } finally {
+        setCreatingPlaylist(false)
+      }
+    } else {
+      // User declined
+      const declineMessage: ConversationMessage = {
+        id: `assistant-${Date.now()}`,
+        type: 'assistant',
+        content: 'Playlist creation cancelled.',
+        timestamp: new Date()
+      }
+      
+      setConversation(prev => [...prev, declineMessage])
+      await ConversationService.addMessage(currentConversationId, declineMessage)
+    }
+    
+    // Reset playlist state
+    setPendingPlaylistDetails(null)
+    setShowPlaylistConfirmation(false)
   }
 
   const theme = useTheme()
@@ -1198,9 +1325,14 @@ export default function ChatApp() {
               maxRows={6}
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Type your message here..."
+              placeholder={
+                creatingPlaylist ? "Creating playlist..." :
+                showPlaylistConfirmation ? "Use the buttons to confirm or cancel playlist creation" : 
+                "Type your message here..."
+              }
               variant="outlined"
               fullWidth
+              disabled={showPlaylistConfirmation || creatingPlaylist}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
@@ -1221,25 +1353,62 @@ export default function ChatApp() {
               }}
             />
             
-            <Fab
-              type="submit"
-              disabled={isButtonDisabled}
-              size="medium"
-              color="primary"
-              sx={{ 
-                minWidth: 48,
-                minHeight: 48,
-                transition: 'all 0.2s',
-                '&:hover': {
-                  transform: 'scale(1.05)'
-                },
-                '&:active': {
-                  transform: 'scale(0.95)'
-                }
-              }}
-            >
-              <SendIcon />
-            </Fab>
+            {showPlaylistConfirmation ? (
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Fab
+                  size="medium"
+                  color="success"
+                  onClick={() => handlePlaylistConfirmation(true, 'yes')}
+                  disabled={creatingPlaylist}
+                  sx={{ 
+                    minWidth: 48,
+                    minHeight: 48,
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      transform: 'scale(1.05)'
+                    }
+                  }}
+                >
+                  <CheckIcon />
+                </Fab>
+                <Fab
+                  size="medium"
+                  color="error"
+                  onClick={() => handlePlaylistConfirmation(false, 'no')}
+                  disabled={creatingPlaylist}
+                  sx={{ 
+                    minWidth: 48,
+                    minHeight: 48,
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      transform: 'scale(1.05)'
+                    }
+                  }}
+                >
+                  <CloseIcon />
+                </Fab>
+              </Box>
+            ) : (
+              <Fab
+                type="submit"
+                disabled={isButtonDisabled}
+                size="medium"
+                color="primary"
+                sx={{ 
+                  minWidth: 48,
+                  minHeight: 48,
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    transform: 'scale(1.05)'
+                  },
+                  '&:active': {
+                    transform: 'scale(0.95)'
+                  }
+                }}
+              >
+                <SendIcon />
+              </Fab>
+            )}
           </Box>
         </Container>
       </Paper>
