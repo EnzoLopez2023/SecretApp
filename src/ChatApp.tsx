@@ -79,7 +79,7 @@ import {
 
 // Import local data and services
 import shopData from './assets/MyShop.json'  // Woodworking shop data
-import { isPlexQuestion, generatePlexContext, isPlaylistCreationRequest, extractPlaylistDetails, executePlaylistCreation } from './ChatAgent/PlexAgent'  // Plex intelligence
+import { isPlexQuestion, generatePlexContext, isPlaylistCreationRequest, extractPlaylistDetails, executePlaylistCreation, isCollectionRequest, extractCollectionDetails, executeCollectionCreation } from './ChatAgent/PlexAgent'  // Plex intelligence
 import MarkdownRenderer from './components/MarkdownRenderer'  // For formatting AI responses
 import { ConversationService, type Conversation, type ConversationMessage } from './services/conversationService'  // Database operations
 
@@ -471,6 +471,11 @@ export default function ChatApp() {
   const [showPlaylistConfirmation, setShowPlaylistConfirmation] = useState(false)
   const [creatingPlaylist, setCreatingPlaylist] = useState(false)
   
+  // Collection creation workflow state
+  const [pendingCollectionDetails, setPendingCollectionDetails] = useState<any>(null)
+  const [showCollectionConfirmation, setShowCollectionConfirmation] = useState(false)
+  const [creatingCollection, setCreatingCollection] = useState(false)
+  
   // Reference to the bottom of messages (for auto-scrolling)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -640,6 +645,18 @@ export default function ChatApp() {
       }
     }
     
+    // Check if this is a response to collection confirmation
+    if (showCollectionConfirmation) {
+      const isConfirmation = /^(yes|y|yeah|sure|ok|okay|proceed|go ahead|create it|do it)$/i.test(currentQuestion) ||
+                           /^(no|n|nope|cancel|don't|dont|nevermind|never mind)$/i.test(currentQuestion)
+      
+      if (isConfirmation) {
+        const confirmed = /^(yes|y|yeah|sure|ok|okay|proceed|go ahead|create it|do it)$/i.test(currentQuestion)
+        await handleCollectionConfirmation(confirmed, currentQuestion)
+        return
+      }
+    }
+    
     // Create a new conversation if we don't have one
     let conversationId = currentConversationId
     if (!conversationId) {
@@ -704,6 +721,33 @@ export default function ChatApp() {
           id: `assistant-${Date.now()}`,
           type: 'assistant',
           content: `I can create a playlist "${playlistDetails.playlistName}" with movies matching "${playlistDetails.searchTerm}". Would you like me to proceed?`,
+          timestamp: new Date()
+        }
+        
+        setConversation(prev => [...prev, confirmationMessage])
+        
+        // Save confirmation message to database
+        try {
+          await ConversationService.addMessage(conversationId, confirmationMessage)
+        } catch (error) {
+          console.error('Error saving confirmation message:', error)
+        }
+        
+        return // Exit here to wait for user confirmation
+      }
+      
+      // Check for collection creation requests
+      if (isCollectionRequest(currentQuestion)) {
+        const collectionDetails = extractCollectionDetails(currentQuestion)
+        setPendingCollectionDetails(collectionDetails)
+        setShowCollectionConfirmation(true)
+        setLoading(false)
+        
+        // Add confirmation message to conversation
+        const confirmationMessage: ConversationMessage = {
+          id: `assistant-${Date.now()}`,
+          type: 'assistant',
+          content: `I can create a collection "${collectionDetails.collectionName}" with movies matching "${collectionDetails.searchTerm}". This collection will group related movies together in your library. Would you like me to proceed?`,
           timestamp: new Date()
         }
         
@@ -878,6 +922,87 @@ export default function ChatApp() {
     // Reset playlist state
     setPendingPlaylistDetails(null)
     setShowPlaylistConfirmation(false)
+  }
+
+  // Handle collection creation confirmation
+  const handleCollectionConfirmation = async (confirmed: boolean, userResponse: string) => {
+    if (!pendingCollectionDetails || !currentConversationId) return
+    
+    // Add user's confirmation response to conversation
+    const userMessage: ConversationMessage = {
+      id: `user-${Date.now()}`,
+      type: 'user',
+      content: userResponse,
+      timestamp: new Date()
+    }
+    
+    setConversation(prev => [...prev, userMessage])
+    
+    try {
+      await ConversationService.addMessage(currentConversationId, userMessage)
+    } catch (error) {
+      console.error('Error saving user response:', error)
+    }
+
+    if (confirmed) {
+      setCreatingCollection(true)
+      
+      try {
+        // Get API base URL
+        const configuredBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '')
+        const apiBaseUrl = configuredBase || (import.meta.env.DEV ? 'http://localhost:3001/api' : `${window.location.origin}/api`)
+        
+        const result = await executeCollectionCreation(
+          userResponse,
+          pendingCollectionDetails.searchTerm,
+          pendingCollectionDetails.collectionName,
+          pendingCollectionDetails.collectionSummary,
+          apiBaseUrl
+        )
+        
+        // Add success message to conversation
+        const successMessage: ConversationMessage = {
+          id: `assistant-${Date.now()}`,
+          type: 'assistant',
+          content: result,
+          timestamp: new Date()
+        }
+        
+        setConversation(prev => [...prev, successMessage])
+        await ConversationService.addMessage(currentConversationId, successMessage)
+        
+      } catch (error) {
+        console.error('Error creating collection:', error)
+        
+        // Add error message to conversation
+        const errorMessage: ConversationMessage = {
+          id: `assistant-${Date.now()}`,
+          type: 'assistant',
+          content: `Sorry, I encountered an error creating the collection: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          timestamp: new Date()
+        }
+        
+        setConversation(prev => [...prev, errorMessage])
+        await ConversationService.addMessage(currentConversationId, errorMessage)
+      } finally {
+        setCreatingCollection(false)
+      }
+    } else {
+      // User declined
+      const declineMessage: ConversationMessage = {
+        id: `assistant-${Date.now()}`,
+        type: 'assistant',
+        content: 'Collection creation cancelled.',
+        timestamp: new Date()
+      }
+      
+      setConversation(prev => [...prev, declineMessage])
+      await ConversationService.addMessage(currentConversationId, declineMessage)
+    }
+    
+    // Reset collection state
+    setPendingCollectionDetails(null)
+    setShowCollectionConfirmation(false)
   }
 
   const theme = useTheme()
@@ -1327,12 +1452,14 @@ export default function ChatApp() {
               onChange={(e) => setQuestion(e.target.value)}
               placeholder={
                 creatingPlaylist ? "Creating playlist..." :
+                creatingCollection ? "Creating collection..." :
                 showPlaylistConfirmation ? "Use the buttons to confirm or cancel playlist creation" : 
+                showCollectionConfirmation ? "Use the buttons to confirm or cancel collection creation" :
                 "Type your message here..."
               }
               variant="outlined"
               fullWidth
-              disabled={showPlaylistConfirmation || creatingPlaylist}
+              disabled={showPlaylistConfirmation || creatingPlaylist || showCollectionConfirmation || creatingCollection}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
@@ -1353,13 +1480,16 @@ export default function ChatApp() {
               }}
             />
             
-            {showPlaylistConfirmation ? (
+            {showPlaylistConfirmation || showCollectionConfirmation ? (
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <Fab
                   size="medium"
                   color="success"
-                  onClick={() => handlePlaylistConfirmation(true, 'yes')}
-                  disabled={creatingPlaylist}
+                  onClick={() => showPlaylistConfirmation ? 
+                    handlePlaylistConfirmation(true, 'yes') : 
+                    handleCollectionConfirmation(true, 'yes')
+                  }
+                  disabled={creatingPlaylist || creatingCollection}
                   sx={{ 
                     minWidth: 48,
                     minHeight: 48,
@@ -1374,8 +1504,11 @@ export default function ChatApp() {
                 <Fab
                   size="medium"
                   color="error"
-                  onClick={() => handlePlaylistConfirmation(false, 'no')}
-                  disabled={creatingPlaylist}
+                  onClick={() => showPlaylistConfirmation ? 
+                    handlePlaylistConfirmation(false, 'no') : 
+                    handleCollectionConfirmation(false, 'no')
+                  }
+                  disabled={creatingPlaylist || creatingCollection}
                   sx={{ 
                     minWidth: 48,
                     minHeight: 48,

@@ -753,6 +753,51 @@ Note: This will actually create a playlist in your Plex server. The playlist wil
     }
     
     // ============================================================================================
+    // STEP 1.6: Handle Collection Creation Requests
+    // ============================================================================================
+    
+    // Check if this is a collection creation request
+    if (isCollectionRequest(question)) {
+      console.log(`📁 Detected collection creation request`)
+      
+      // Extract collection details from the question
+      const collectionDetails = extractCollectionDetails(question)
+      
+      if (collectionDetails.searchTerm) {
+        console.log(`🔍 Creating collection: "${collectionDetails.collectionName}" with search term: "${collectionDetails.searchTerm}"`)
+        
+        // Create confirmation message for user
+        const confirmationMessage = `
+📁 COLLECTION CREATION REQUEST DETECTED
+
+I can help you create a Plex collection with the following details:
+📝 Collection Name: "${collectionDetails.collectionName}"
+🔍 Search Term: "${collectionDetails.searchTerm}"
+📋 Action: ${collectionDetails.actionType}
+📄 Description: ${collectionDetails.collectionSummary}
+
+To proceed with creating this collection, I need your confirmation.
+Would you like me to:
+
+1. Search your Plex library for movies matching "${collectionDetails.searchTerm}"
+2. Create a new collection called "${collectionDetails.collectionName}"
+3. Add the found movies to the collection
+4. Set the collection description to: "${collectionDetails.collectionSummary}"
+
+Please respond with "Yes, create the collection" to proceed, or let me know if you'd like to modify any details.
+
+Note: Collections are different from playlists - they group related movies together in your library view and appear as a single grouped item. This will actually create a collection in your Plex server.
+`
+        
+        context += confirmationMessage
+        return context
+      } else {
+        context += `\n⚠️ I detected a collection creation request, but couldn't determine what movies to include. Please specify what you'd like in the collection (e.g., "Create a collection of Tom Cruise movies" or "Group all Marvel movies in a collection").\n`
+        return context
+      }
+    }
+    
+    // ============================================================================================
     // STEP 2: Get Plex Library Information
     // ============================================================================================
     
@@ -1057,6 +1102,404 @@ To cancel or modify the request, just let me know what you'd like to change.
 }
 
 // ================================================================================================
+// COLLECTION MANAGEMENT FUNCTIONS - Handle Plex collection creation and updates
+// ================================================================================================
+
+/**
+ * Detects if a question is asking to create or manage a collection
+ * 
+ * PURPOSE: Identifies when users want to create or update collections like:
+ * - "Create a collection of Tom Cruise movies"
+ * - "Group all Mission Impossible movies in a collection"
+ * - "Make a Marvel collection with all superhero movies"
+ * - "Update my Action Movies collection"
+ * 
+ * LEARNING CONCEPTS:
+ * - Pattern recognition for collection management requests
+ * - Distinguishing between collections and playlists
+ * - Natural language processing for user intent
+ * 
+ * @param question - The user's question
+ * @returns true if the question asks to create or manage a collection
+ */
+export const isCollectionRequest = (question: string): boolean => {
+  const collectionKeywords = [
+    'create collection', 'make collection', 'collection of', 'collection with', 'collection containing',
+    'create a collection', 'make a collection', 'build collection', 'generate collection',
+    'group movies', 'group films', 'organize movies', 'organize films',
+    'collection for', 'new collection', 'update collection', 'add to collection'
+  ]
+  
+  const lowerQuestion = question.toLowerCase()
+  return collectionKeywords.some(keyword => lowerQuestion.includes(keyword))
+}
+
+/**
+ * Extracts collection details from a user's request
+ * 
+ * PURPOSE: Parses collection creation/update requests to extract:
+ * - What movies/shows to include
+ * - Desired collection name
+ * - Collection description/summary
+ * - Target library section
+ * 
+ * EXAMPLE INPUTS:
+ * - "Create a collection of Tom Cruise movies"
+ * - "Group all Mission Impossible movies in a collection called 'MI Collection'"
+ * - "Make a Marvel collection with all superhero movies"
+ * 
+ * @param question - The user's collection request
+ * @returns Object with collection details
+ */
+export const extractCollectionDetails = (question: string): {
+  searchTerm: string
+  collectionName: string
+  collectionSummary: string
+  actionType: 'create' | 'update' | 'add'
+} => {
+  const lowerQuestion = question.toLowerCase()
+  
+  // Determine action type
+  let actionType: 'create' | 'update' | 'add' = 'create'
+  if (lowerQuestion.includes('update') || lowerQuestion.includes('modify')) {
+    actionType = 'update'
+  } else if (lowerQuestion.includes('add to')) {
+    actionType = 'add'
+  }
+  
+  // Extract search term (what movies/shows to find)
+  let searchTerm = ''
+  
+  // Look for patterns like "Tom Cruise movies", "Marvel movies", "Mission Impossible films"
+  const searchPatterns = [
+    /(?:collection (?:of|with|containing) )([^,]+?)(?:\s+(?:movies|films|shows))/i,
+    /(?:collection (?:of|with|containing) )([^,]+)/i,
+    /(?:group all )([^,]+?)(?:\s+(?:movies|films|shows))/i,
+    /(?:group all )([^,]+)/i,
+    /(?:called '[^']+' with )([^,]+)/i,
+    /(?:called "[^"]+" with )([^,]+)/i,
+    /(?:movies (?:with|starring|featuring) )([^,]+)/i,
+    /(?:films (?:with|starring|featuring) )([^,]+)/i
+  ]
+  
+  for (const pattern of searchPatterns) {
+    const match = question.match(pattern)
+    if (match) {
+      searchTerm = match[1].trim()
+      break
+    }
+  }
+  
+  // Extract collection name if specified
+  let collectionName = ''
+  const namePatterns = [
+    /(?:collection called|called) '([^']+)'/i,
+    /(?:collection called|called) "([^"]+)"/i,
+    /(?:collection called|called) ([^,\s]+)/i,
+    /(?:into a collection) '([^']+)'/i,
+    /(?:into a collection) "([^"]+)"/i
+  ]
+  
+  for (const pattern of namePatterns) {
+    const match = question.match(pattern)
+    if (match) {
+      collectionName = match[1].trim()
+      break
+    }
+  }
+  
+  // If no explicit name, generate one from search term
+  if (!collectionName && searchTerm) {
+    // Handle actor names vs movie series differently
+    if (searchTerm.toLowerCase().includes('tom cruise') || 
+        searchTerm.toLowerCase().includes('leonardo dicaprio') || 
+        searchTerm.toLowerCase().includes('brad pitt') ||
+        searchTerm.split(' ').length >= 2) {
+      collectionName = `${searchTerm} Movies`
+    } else {
+      collectionName = `${searchTerm} Collection`
+    }
+  }
+  
+  // Generate collection summary
+  let collectionSummary = ''
+  if (searchTerm) {
+    if (searchTerm.toLowerCase().includes('marvel') || searchTerm.toLowerCase().includes('mcu')) {
+      collectionSummary = 'A collection of Marvel Cinematic Universe movies and related superhero content.'
+    } else if (searchTerm.toLowerCase().includes('dc') || searchTerm.toLowerCase().includes('batman') || searchTerm.toLowerCase().includes('superman')) {
+      collectionSummary = 'A collection of DC Comics movies and superhero content.'
+    } else if (searchTerm.split(' ').length >= 2) {
+      // Likely an actor name
+      collectionSummary = `A curated collection of movies featuring ${searchTerm}.`
+    } else {
+      collectionSummary = `A collection of ${searchTerm} movies and related content.`
+    }
+  }
+  
+  return {
+    searchTerm,
+    collectionName,
+    collectionSummary,
+    actionType
+  }
+}
+
+/**
+ * Creates a Plex collection with specified movies
+ * 
+ * WHAT THIS DOES:
+ * 1. Searches for movies matching the criteria
+ * 2. Determines the best library section for the collection
+ * 3. Creates a new collection in Plex
+ * 4. Adds found movies to the collection
+ * 5. Returns confirmation with details
+ * 
+ * EXAMPLE USAGE:
+ * await createPlexCollection("Tom Cruise", "Tom Cruise Movies", "Movies featuring Tom Cruise", apiBaseUrl)
+ * 
+ * LEARNING CONCEPTS:
+ * - Library section detection and selection
+ * - Collection vs playlist differences in Plex
+ * - Bulk movie operations
+ * - Error handling for complex workflows
+ * 
+ * @param searchTerm - What to search for (e.g., "Tom Cruise")
+ * @param collectionName - Name for the new collection
+ * @param collectionSummary - Description for the collection
+ * @param apiBaseUrl - API endpoint
+ * @returns Promise with collection creation result
+ */
+export const createPlexCollection = async (
+  searchTerm: string,
+  collectionName: string,
+  collectionSummary: string,
+  apiBaseUrl: string
+): Promise<{
+  success: boolean
+  message: string
+  collectionId?: string
+  moviesAdded: number
+  movieTitles: string[]
+  sectionName: string
+}> => {
+  try {
+    // Step 1: Search for movies matching the criteria
+    console.log(`🎬 Searching for movies matching: "${searchTerm}"`)
+    const searchResponse = await searchPlexMovies(searchTerm, apiBaseUrl)
+    
+    if (!searchResponse || !searchResponse.movies || searchResponse.movies.length === 0) {
+      return {
+        success: false,
+        message: `No movies found matching "${searchTerm}". Please check the spelling or try a different search term.`,
+        moviesAdded: 0,
+        movieTitles: [],
+        sectionName: 'Unknown'
+      }
+    }
+
+    const movies = searchResponse.movies
+    
+    // Step 2: Get library sections to find the best movie library
+    console.log(`📚 Finding appropriate library section for collection`)
+    const statsResponse = await fetchPlexStats(apiBaseUrl)
+    
+    if (!statsResponse || !statsResponse.libraries) {
+      throw new Error('Could not fetch library information')
+    }
+    
+    // Find the best movie library (prefer "All Movies" or largest movie library)
+    const movieLibraries = statsResponse.libraries.filter(lib => lib.type === 'movie')
+    
+    if (movieLibraries.length === 0) {
+      throw new Error('No movie libraries found in Plex server')
+    }
+    
+    let targetLibrary = movieLibraries.find(lib => lib.title.toLowerCase() === 'all movies') ||
+                       movieLibraries.find(lib => lib.title.toLowerCase().includes('movie')) ||
+                       movieLibraries.reduce((prev, current) => (prev.count > current.count) ? prev : current)
+
+    // Step 3: Create the collection
+    console.log(`📁 Creating collection: "${collectionName}" in library: "${targetLibrary.title}"`)
+    const createResponse = await fetch(`${apiBaseUrl}/plex/collections`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        title: collectionName,
+        type: 'movie',
+        sectionId: targetLibrary.key,
+        summary: collectionSummary
+      })
+    })
+
+    if (!createResponse.ok) {
+      throw new Error(`Failed to create collection: ${createResponse.status}`)
+    }
+
+    const collectionData = await createResponse.json()
+    const collectionId = collectionData.MediaContainer?.Metadata?.[0]?.ratingKey
+
+    if (!collectionId) {
+      throw new Error('Created collection but could not get collection ID')
+    }
+
+    // Step 4: Add movies to the collection
+    console.log(`➕ Adding ${movies.length} movies to collection`)
+    const movieKeys = movies.map(movie => movie.key).filter(key => key)
+    
+    if (movieKeys.length === 0) {
+      return {
+        success: false,
+        message: 'Found movies but could not get their IDs for collection creation.',
+        moviesAdded: 0,
+        movieTitles: [],
+        sectionName: targetLibrary.title
+      }
+    }
+
+    // Create URI string for multiple movies
+    const uri = movieKeys.map(key => `server://your-plex-server/com.plexapp.plugins.library/library/metadata/${key}`).join(',')
+
+    const addResponse = await fetch(`${apiBaseUrl}/plex/collections/${collectionId}/items`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ uri })
+    })
+
+    if (!addResponse.ok) {
+      throw new Error(`Failed to add movies to collection: ${addResponse.status}`)
+    }
+
+    const movieTitles = movies.map(movie => movie.title)
+    
+    return {
+      success: true,
+      message: `Successfully created collection "${collectionName}" with ${movies.length} movies in "${targetLibrary.title}" library!`,
+      collectionId,
+      moviesAdded: movies.length,
+      movieTitles,
+      sectionName: targetLibrary.title
+    }
+
+  } catch (error) {
+    console.error('❌ Collection creation error:', error)
+    return {
+      success: false,
+      message: `Failed to create collection: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      moviesAdded: 0,
+      movieTitles: [],
+      sectionName: 'Unknown'
+    }
+  }
+}
+
+/**
+ * Handles collection creation confirmation and execution
+ * 
+ * WHAT THIS DOES:
+ * When a user confirms they want to create a collection, this function:
+ * 1. Detects confirmation responses
+ * 2. Retrieves the previous collection request details
+ * 3. Actually creates the collection
+ * 4. Returns status and results
+ * 
+ * CONFIRMATION PATTERNS:
+ * - "Yes, create the collection"
+ * - "Yes" (if in collection context)
+ * - "Create it"
+ * - "Make the collection"
+ * 
+ * @param question - User's response
+ * @param searchTerm - What to search for
+ * @param collectionName - Name for the collection
+ * @param collectionSummary - Description for the collection
+ * @param apiBaseUrl - API endpoint
+ * @returns Promise with execution result
+ */
+export const executeCollectionCreation = async (
+  question: string,
+  searchTerm: string,
+  collectionName: string,
+  collectionSummary: string,
+  apiBaseUrl: string
+): Promise<string> => {
+  const lowerQuestion = question.toLowerCase()
+  
+  // Check if user is confirming collection creation
+  const confirmationPatterns = [
+    'yes, create the collection',
+    'yes create',
+    'create it',
+    'make the collection',
+    'go ahead',
+    'proceed',
+    'do it',
+    /^yes[,.]?\s*(please)?$/
+  ]
+  
+  const isConfirmation = confirmationPatterns.some(pattern => {
+    if (typeof pattern === 'string') {
+      return lowerQuestion.includes(pattern)
+    } else {
+      return pattern.test(lowerQuestion)
+    }
+  })
+  
+  if (isConfirmation) {
+    console.log(`✅ User confirmed collection creation`)
+    
+    // Actually create the collection
+    const result = await createPlexCollection(searchTerm, collectionName, collectionSummary, apiBaseUrl)
+    
+    if (result.success) {
+      return `
+🎉 SUCCESS! Collection Created Successfully!
+
+📁 Collection Name: "${collectionName}"
+📚 Library: ${result.sectionName}
+🎬 Movies Added: ${result.moviesAdded}
+📝 Description: ${collectionSummary}
+
+🍿 Movies in your collection:
+${result.movieTitles.map((title, index) => `${index + 1}. ${title}`).join('\n')}
+
+✅ The collection has been added to your Plex server and should be visible in your "${result.sectionName}" library.
+
+Collections appear as grouped items in your library and help organize related content. You can find it by browsing your movie library or using Plex's collection filters! 🎬
+`
+    } else {
+      return `
+❌ Collection Creation Failed
+
+${result.message}
+
+You can try:
+- Checking the spelling of the search term
+- Using a broader search term (e.g., "Tom Cruise" instead of "Thomas Cruise Mapother IV")
+- Making sure you have movies matching the criteria in your Plex library
+- Ensuring your Plex server has the necessary permissions for collection creation
+
+Would you like to try again with different criteria?
+`
+    }
+  } else {
+    return `
+🤔 I didn't understand your response.
+
+To create the collection, please respond with:
+- "Yes, create the collection"
+- "Yes"
+- "Create it"
+
+To cancel or modify the request, just let me know what you'd like to change.
+`
+  }
+}
+
+// ================================================================================================
 // EXPORTS - Making functions available to other files
 // ================================================================================================
 
@@ -1076,6 +1519,10 @@ export default {
   extractPlaylistDetails,
   createPlexPlaylist,
   executePlaylistCreation,
+  isCollectionRequest,
+  extractCollectionDetails,
+  createPlexCollection,
+  executeCollectionCreation,
   fetchPlexStats,
   searchPlexMovies,
   fetchMovieDetails,

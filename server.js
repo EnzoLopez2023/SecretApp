@@ -263,6 +263,174 @@ app.get('/api/plex/playlists', async (req, res) => {
 })
 
 // ============================================
+// Plex Collection Management Endpoints
+// ============================================
+
+// Create a new collection
+app.post('/api/plex/collections', async (req, res) => {
+  try {
+    const { title, type = 'movie', sectionId, summary, uri } = req.body
+    
+    if (!title) {
+      return res.status(400).json({ error: 'Collection title is required' })
+    }
+    
+    if (!sectionId) {
+      return res.status(400).json({ error: 'Section ID is required' })
+    }
+
+    // Build the collection creation URL
+    const createUrl = `${plexConfig.baseUrl}/library/sections/${sectionId}/collections?X-Plex-Token=${plexConfig.token}`
+    
+    // Prepare form data for collection creation
+    const formData = new URLSearchParams()
+    formData.append('title', title)
+    formData.append('type', type)
+    if (summary) {
+      formData.append('summary', summary)
+    }
+    if (uri) {
+      formData.append('uri', uri)
+    }
+
+    const plexResponse = await fetch(createUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: formData,
+      agent: plexAgent
+    })
+
+    if (!plexResponse.ok) {
+      const errorText = await plexResponse.text()
+      console.error('Plex collection creation failed:', plexResponse.status, errorText)
+      throw new Error(`Plex collection creation failed with status ${plexResponse.status}`)
+    }
+
+    const data = await plexResponse.json()
+    res.json(data)
+  } catch (error) {
+    console.error('Plex collection creation error:', error)
+    res.status(500).json({ error: 'Failed to create Plex collection' })
+  }
+})
+
+// Add items to a collection
+app.put('/api/plex/collections/:collectionId/items', async (req, res) => {
+  try {
+    const { collectionId } = req.params
+    const { uri } = req.body
+    
+    if (!uri) {
+      return res.status(400).json({ error: 'URI is required to add items to collection' })
+    }
+
+    const addUrl = `${plexConfig.baseUrl}/library/collections/${collectionId}/items?uri=${encodeURIComponent(uri)}&X-Plex-Token=${plexConfig.token}`
+
+    const plexResponse = await fetch(addUrl, {
+      method: 'PUT',
+      agent: plexAgent
+    })
+
+    if (!plexResponse.ok) {
+      throw new Error(`Failed to add items to collection with status ${plexResponse.status}`)
+    }
+
+    const data = await plexResponse.json()
+    res.json(data)
+  } catch (error) {
+    console.error('Plex collection add items error:', error)
+    res.status(500).json({ error: 'Failed to add items to Plex collection' })
+  }
+})
+
+// Update collection details
+app.put('/api/plex/collections/:collectionId', async (req, res) => {
+  try {
+    const { collectionId } = req.params
+    const { title, summary } = req.body
+
+    const updateUrl = `${plexConfig.baseUrl}/library/collections/${collectionId}?X-Plex-Token=${plexConfig.token}`
+    
+    const formData = new URLSearchParams()
+    if (title) formData.append('title', title)
+    if (summary) formData.append('summary', summary)
+
+    const plexResponse = await fetch(updateUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: formData,
+      agent: plexAgent
+    })
+
+    if (!plexResponse.ok) {
+      throw new Error(`Failed to update collection with status ${plexResponse.status}`)
+    }
+
+    const data = await plexResponse.json()
+    res.json(data)
+  } catch (error) {
+    console.error('Plex collection update error:', error)
+    res.status(500).json({ error: 'Failed to update Plex collection' })
+  }
+})
+
+// Get all collections from a library section
+app.get('/api/plex/sections/:sectionId/collections', async (req, res) => {
+  try {
+    const { sectionId } = req.params
+    const url = `${plexConfig.baseUrl}/library/sections/${sectionId}/collections?X-Plex-Token=${plexConfig.token}`
+
+    const plexResponse = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json'
+      },
+      agent: plexAgent
+    })
+
+    if (!plexResponse.ok) {
+      throw new Error(`Plex collections request failed with status ${plexResponse.status}`)
+    }
+
+    const data = await plexResponse.json()
+    res.json(data)
+  } catch (error) {
+    console.error('Plex collections fetch error:', error)
+    res.status(500).json({ error: 'Failed to fetch Plex collections' })
+  }
+})
+
+// Get collection details and items
+app.get('/api/plex/collections/:collectionId', async (req, res) => {
+  try {
+    const { collectionId } = req.params
+    const url = `${plexConfig.baseUrl}/library/collections/${collectionId}/children?X-Plex-Token=${plexConfig.token}`
+
+    const plexResponse = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json'
+      },
+      agent: plexAgent
+    })
+
+    if (!plexResponse.ok) {
+      throw new Error(`Plex collection details request failed with status ${plexResponse.status}`)
+    }
+
+    const data = await plexResponse.json()
+    res.json(data)
+  } catch (error) {
+    console.error('Plex collection details fetch error:', error)
+    res.status(500).json({ error: 'Failed to fetch Plex collection details' })
+  }
+})
+
+// ============================================
 // Plex Library Information Endpoints
 // ============================================
 
