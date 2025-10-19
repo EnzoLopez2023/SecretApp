@@ -1,52 +1,131 @@
+/**
+ * PlexMovieInsights.tsx - Advanced Movie Library Analytics and Discovery System
+ * 
+ * WHAT THIS COMPONENT DOES:
+ * This is a sophisticated movie discovery and analytics system that provides:
+ * 1. 🎬 MOVIE EXPLORATION: Browse and discover movies in your Plex library
+ * 2. 🔍 ADVANCED SEARCH: Multi-criteria filtering (genre, year, rating, director, etc.)
+ * 3. 📊 ANALYTICS: Statistical insights about your movie collection
+ * 4. 🎲 RANDOM DISCOVERY: "What should I watch?" recommendation engine
+ * 5. 📱 RESPONSIVE UI: Beautiful card-based layout that works on all devices
+ * 6. 🎭 RICH METADATA: Display detailed movie information, cast, and technical specs
+ * 7. 🏷️ SMART FILTERING: Real-time filtering by multiple attributes
+ * 8. 📈 LIBRARY INSIGHTS: Statistics about your collection (counts, formats, etc.)
+ * 
+ * LEARNING CONCEPTS FOR STUDENTS:
+ * - Complex state management with multiple interconnected filters
+ * - Advanced React hooks (useMemo for performance optimization)
+ * - useCallback for preventing unnecessary re-renders
+ * - RESTful API integration with external services (Plex server)
+ * - Advanced TypeScript interfaces for complex data structures
+ * - Search algorithms and multi-criteria filtering
+ * - Data visualization and statistics calculation
+ * - Responsive grid layouts with Material-UI
+ * - Event handling and user interaction patterns
+ * - Performance optimization techniques
+ * - Error handling and loading states
+ * 
+ * REAL-WORLD APPLICATION:
+ * This demonstrates how to build a content discovery system similar to:
+ * - Netflix's movie browser
+ * - IMDb's search interface
+ * - Streaming service recommendation engines
+ * 
+ * DATA INTEGRATION ARCHITECTURE:
+ * ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+ * │ PlexMovieInsights│───▶│   Plex Server   │───▶│  Movie Database │
+ * │   (Frontend)    │    │   (Media API)   │    │    (Metadata)   │
+ * └─────────────────┘    └─────────────────┘    └─────────────────┘
+ *         │                       │                       │
+ *         ▼                       ▼                       ▼
+ * ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+ * │   Search UI     │    │  Library Stats  │    │  Movie Details  │
+ * │ (Filters, Grid) │    │ (Analytics API) │    │ (Rich Metadata) │
+ * └─────────────────┘    └─────────────────┘    └─────────────────┘
+ */
+
+// Import React hooks for advanced state management
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { ArrowLeft } from 'lucide-react'
+
+// Import icons from different libraries
+import { ArrowLeft } from 'lucide-react'  // Modern icon library
+
+// Import Material-UI components for sophisticated UI
 import { 
-  Box, 
-  Typography, 
-  Chip, 
-  Button, 
-  TextField, 
-  InputAdornment, 
-  Select, 
-  MenuItem, 
-  FormControl, 
-  InputLabel,
-  Container,
-  Paper,
-  Card,
-  CardContent,
-  Stack
+  Box,              // Layout container
+  Typography,       // Text with consistent styling
+  Chip,             // Small labeled tags
+  Button,           // Interactive buttons
+  TextField,        // Text input fields
+  InputAdornment,   // Icons/decorations inside inputs
+  Select,           // Dropdown selection
+  MenuItem,         // Options in dropdowns
+  FormControl,      // Wrapper for form elements
+  InputLabel,       // Labels for form controls
+  Container,        // Responsive page container
+  Paper,            // Surface with elevation
+  Card,             // Content cards
+  CardContent,      // Card content area
+  Stack             // Arrangement component
 } from '@mui/material'
-import { Movie as MovieIcon, Shuffle, Search, VideoLibrary } from '@mui/icons-material'
+
+// Import Material-UI icons
+import { 
+  Movie as MovieIcon,   // Movie/film icon
+  Shuffle,              // Random/shuffle icon
+  Search,               // Search/magnifying glass icon
+  VideoLibrary          // Video library icon
+} from '@mui/icons-material'
+
+// Import CSS styles
 import './App.css'
 
+// ============================================================================================
+// TYPESCRIPT INTERFACES - Complex data structure definitions
+// ============================================================================================
+
+/**
+ * PlexMedia Interface - Technical specifications of media files
+ * 
+ * PURPOSE: Represents the technical details of how a movie is encoded and stored
+ * LEARNING CONCEPTS: This shows how streaming services track video quality and format
+ */
 interface PlexMedia {
-  id: number
-  duration: number
-  bitrate: number
-  width: number
-  height: number
-  aspectRatio: number
-  audioChannels: number
-  audioCodec: string
-  videoCodec: string
-  videoResolution: string
-  container: string
-  videoFrameRate: string
+  id: number              // Unique media file ID
+  duration: number        // Length in milliseconds
+  bitrate: number         // Quality/compression rate
+  width: number           // Video width in pixels
+  height: number          // Video height in pixels
+  aspectRatio: number     // Width/height ratio (like 16:9)
+  audioChannels: number   // Number of audio channels (2.0, 5.1, 7.1, etc.)
+  audioCodec: string      // Audio compression format (AAC, DTS, etc.)
+  videoCodec: string      // Video compression format (H.264, H.265, etc.)
+  videoResolution: string // Resolution label (1080p, 4K, etc.)
+  container: string       // File format (MP4, MKV, etc.)
+  videoFrameRate: string  // Frames per second (24fps, 60fps, etc.)
 }
 
+/**
+ * PlexImage Interface - Movie artwork and thumbnails
+ */
 interface PlexImage {
-  alt: string
-  type: string
-  url: string
+  alt: string    // Alternative text for accessibility
+  type: string   // Image type (poster, backdrop, etc.)
+  url: string    // URL to the image file
 }
 
+/**
+ * PlexGenre Interface - Movie categories
+ */
 interface PlexGenre {
-  tag: string
+  tag: string    // Genre name (Action, Comedy, Drama, etc.)
 }
 
+/**
+ * PlexPerson Interface - Cast and crew information
+ */
 interface PlexPerson {
-  tag: string
+  tag: string    // Person's name
 }
 
 interface PlexMovie {

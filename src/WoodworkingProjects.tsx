@@ -1,53 +1,179 @@
+/**
+ * WoodworkingProjects.tsx - Comprehensive Project Management System for Woodworkers
+ * 
+ * WHAT THIS COMPONENT DOES:
+ * This is a complete project management system specifically designed for woodworking that provides:
+ * 1. 📋 PROJECT TRACKING: Create, edit, and manage woodworking projects with detailed information
+ * 2. 📁 FILE MANAGEMENT: Upload and organize project files (plans, photos, PDFs, etc.)
+ * 3. 🔍 PROJECT SEARCH: Find projects by name, materials, status, or description
+ * 4. 📊 PROJECT ANALYTICS: Track project status, completion rates, and timelines
+ * 5. 📱 RESPONSIVE DESIGN: Full mobile support with adaptive layouts
+ * 6. 📄 PDF VIEWER: Built-in PDF viewing for project plans and documentation
+ * 7. 🖼️ IMAGE GALLERY: Photo galleries for project progress and results
+ * 8. 💾 CLOUD STORAGE: Secure file storage and project data persistence
+ * 9. 📈 PROGRESS TRACKING: Status management (Planning, In Progress, Complete, etc.)
+ * 10. 🏷️ MATERIAL TRACKING: Keep track of wood types, hardware, and other materials
+ * 
+ * LEARNING CONCEPTS FOR STUDENTS:
+ * - Advanced React state management with complex nested objects
+ * - File upload and handling with multiple file types
+ * - PDF.js integration for document viewing in the browser
+ * - Form validation and error handling
+ * - RESTful API integration with multipart form data
+ * - Responsive design patterns for mobile and desktop
+ * - Custom hooks for reusable logic
+ * - TypeScript for complex data modeling
+ * - Material-UI advanced component patterns
+ * - Real-time search and filtering
+ * - Image optimization and display
+ * - Error boundaries and graceful error handling
+ * 
+ * REAL-WORLD APPLICATION:
+ * This demonstrates a full-featured project management system similar to:
+ * - Construction project management tools
+ * - Creative portfolio systems
+ * - Document management systems
+ * - Hobby/craft tracking applications
+ * 
+ * TECHNICAL ARCHITECTURE:
+ * ┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
+ * │ WoodworkingProjects │───▶│   Project Service   │───▶│   Backend API       │
+ * │    (Frontend UI)    │    │  (Business Logic)   │    │  (Data & Files)     │
+ * └─────────────────────┘    └─────────────────────┘    └─────────────────────┘
+ *           │                           │                           │
+ *           ▼                           ▼                           ▼
+ * ┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
+ * │   Project Forms     │    │   File Uploads      │    │   MySQL Database    │
+ * │ (Create/Edit/View)  │    │  (PDF, Images)      │    │ + File Storage      │
+ * └─────────────────────┘    └─────────────────────┘    └─────────────────────┘
+ */
+
+// Import React hooks for component functionality
 import { useState, useEffect, useRef } from 'react'
+
+// Import PDF.js for displaying PDF files in the browser
 import { getDocument, GlobalWorkerOptions, version as pdfjsVersion } from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import { Calendar, FileText, Paperclip, X, Trash2, Download, Upload } from 'lucide-react'
+
+// Import Lucide React icons (modern icon library)
 import { 
-  Box, 
-  Typography, 
-  Chip, 
-  Button, 
-  TextField, 
-  InputAdornment, 
-  Container, 
-  Paper,
-  Stack,
-  Skeleton,
-  Alert,
-  Snackbar
+  Calendar,      // Calendar/date icon
+  FileText,      // Document/file icon
+  Paperclip,     // Attachment icon
+  X,             // Close/X icon
+  Trash2,        // Trash/delete icon
+  Download,      // Download icon
+  Upload         // Upload icon
+} from 'lucide-react'
+
+// Import Material-UI components for consistent, beautiful UI
+import { 
+  Box,               // Layout container
+  Typography,        // Text with styling
+  Chip,              // Small labeled elements
+  Button,            // Interactive buttons
+  TextField,         // Text input fields
+  InputAdornment,    // Input decorations
+  Container,         // Page layout container
+  Paper,             // Elevated surface
+  Stack,             // Arrangement component
+  Skeleton,          // Loading placeholders
+  Alert,             // Status messages
+  Snackbar           // Toast notifications
 } from '@mui/material'
+
+// Import Material-UI icons
 import { 
-  Build as BuildIcon, 
-  Add, 
-  Edit, 
-  Delete, 
-  Save as SaveIcon, 
-  Close, 
-  Search,
-  ArrowBack
+  Build as BuildIcon,  // Tools/build icon
+  Add,                 // Plus/add icon
+  Edit,                // Edit/pencil icon
+  Delete,              // Delete/trash icon
+  Save as SaveIcon,    // Save/floppy disk icon
+  Close,               // Close/X icon
+  Search,              // Search/magnifying glass icon
+  ArrowBack            // Back arrow icon
 } from '@mui/icons-material'
-import projectService, { type WoodworkingProject, type ProjectFile, type ProjectFormData } from './services/projectService'
+
+// Import custom service for project data management
+import projectService, { 
+  type WoodworkingProject,    // Main project data structure
+  type ProjectFile,           // File attachment structure
+  type ProjectFormData        // Form data structure
+} from './services/projectService'
+
+// Import CSS styles
 import './App.css'
 
+// ============================================================================================
+// PDF.JS CONFIGURATION
+// ============================================================================================
+
+/**
+ * PDF.js Worker Configuration
+ * 
+ * WHAT THIS DOES: PDF.js needs a "worker" (background process) to render PDF files
+ * WHY WE NEED THIS: PDF rendering is computationally intensive, so it runs in a 
+ * separate thread to keep the UI responsive
+ * 
+ * LEARNING CONCEPT: Web Workers allow JavaScript to run tasks in the background
+ * without blocking the main thread (which handles UI interactions)
+ */
 GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsVersion}/pdf.worker.min.js`
 
-export default function WoodworkingProjects() {
-  const [projects, setProjects] = useState<WoodworkingProject[]>([])
-  const [selectedProject, setSelectedProject] = useState<WoodworkingProject | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [showForm, setShowForm] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [showMobileDetails, setShowMobileDetails] = useState(false)
+// ============================================================================================
+// MAIN COMPONENT - WoodworkingProjects Management System
+// ============================================================================================
 
-  // Form state
+/**
+ * WoodworkingProjects Component - Complete project management interface
+ * 
+ * This component manages the entire project lifecycle from creation to completion,
+ * including file management, progress tracking, and project analytics.
+ * 
+ * COMPONENT RESPONSIBILITIES:
+ * - Project CRUD operations (Create, Read, Update, Delete)
+ * - File upload and management
+ * - Search and filtering
+ * - Mobile-responsive layouts
+ * - PDF viewing integration
+ * - Form validation and error handling
+ */
+export default function WoodworkingProjects() {
+  // ============================================================================================
+  // STATE MANAGEMENT - Complex application state
+  // ============================================================================================
+  
+  // Core data state
+  const [projects, setProjects] = useState<WoodworkingProject[]>([])        // All projects
+  const [selectedProject, setSelectedProject] = useState<WoodworkingProject | null>(null)  // Currently viewed project
+  
+  // UI interaction state
+  const [searchTerm, setSearchTerm] = useState('')                         // Current search query
+  const [showForm, setShowForm] = useState(false)                          // Whether form is visible
+  const [isEditing, setIsEditing] = useState(false)                        // Whether we're editing (vs creating)
+  const [showMobileDetails, setShowMobileDetails] = useState(false)        // Mobile view state
+  
+  // Operation state
+  const [uploading, setUploading] = useState(false)                        // File upload in progress
+  const [loading, setLoading] = useState(true)                             // Initial data loading
+  const [error, setError] = useState<string | null>(null)                  // Error messages
+
+  // ============================================================================================
+  // FORM STATE - Project creation and editing
+  // ============================================================================================
+  
+  /**
+   * Form Data State - Manages the project creation/editing form
+   * 
+   * LEARNING CONCEPT: Complex forms often use a single state object
+   * rather than individual useState calls for each field. This makes
+   * it easier to manage related data and perform validation.
+   */
   const [formData, setFormData] = useState<ProjectFormData>({
-    title: '',
-    date: new Date().toISOString().split('T')[0],
-    materials: '',
-    description: '',
+    title: '',                                    // Project name
+    date: new Date().toISOString().split('T')[0], // Default to today's date
+    materials: '',                                // Wood types, hardware, etc.
+    description: '',                              // Project details
     status: 'planned',
     files: []
   })

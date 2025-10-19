@@ -1,64 +1,132 @@
-import { useState, useRef, useEffect } from 'react'
-import {
-  Box,
-  Paper,
-  TextField,
-  Typography,
-  Chip,
-  AppBar,
-  Toolbar,
-  Container,
-  Stack,
-  Avatar,
-  Fade,
-  Grow,
-  useTheme,
-  alpha,
-  Tooltip,
-  Fab,
-  IconButton,
-  Select,
-  MenuItem,
-  FormControl,
-  Button,
-  CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions
-} from '@mui/material'
-import {
-  Send as SendIcon,
-  Person as PersonIcon,
-  SmartToy as BotIcon,
-  Clear as ClearIcon,
-  AutoAwesome as SparkleIcon,
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  ExpandMore as ExpandMoreIcon
-} from '@mui/icons-material'
-import { AzureOpenAI } from "openai"
-import shopData from './assets/MyShop.json'
-import { isPlexQuestion, generatePlexContext } from './ChatAgent/PlexAgent'
-import MarkdownRenderer from './components/MarkdownRenderer'
-import { ConversationService, type Conversation, type ConversationMessage } from './services/conversationService'
+/**
+ * ChatApp.tsx - Main Chat Application Component
+ * 
+ * WHAT THIS FILE DOES:
+ * This is the main chat interface where users can:
+ * 1. Type messages and get AI responses
+ * 2. Manage multiple conversations (create, switch, delete)
+ * 3. Get intelligent responses about their Plex media library
+ * 4. Get answers about woodworking shop data
+ * 
+ * KEY LEARNING CONCEPTS FOR STUDENTS:
+ * - React Hooks (useState, useEffect, useRef)
+ * - Material-UI component library
+ * - Async/await for API calls
+ * - TypeScript interfaces and type safety
+ * - State management in React
+ * - Event handling (onClick, onSubmit, etc.)
+ * - Real-time UI updates
+ * - Local storage and persistence
+ * - Array manipulation and rendering
+ * 
+ * ARCHITECTURE OVERVIEW:
+ * ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+ * │   ChatApp.tsx   │───▶│   PlexAgent.ts   │───▶│   server.js     │
+ * │  (Frontend UI)  │    │ (Smart Context)  │    │   (Backend)     │
+ * └─────────────────┘    └──────────────────┘    └─────────────────┘
+ *         │                                              │
+ *         ▼                                              ▼
+ * ┌─────────────────┐                            ┌─────────────────┐
+ * │ Azure OpenAI    │                            │  Plex Server    │
+ * │   (AI Brain)    │                            │ (Media Library) │
+ * └─────────────────┘                            └─────────────────┘
+ */
 
-// Azure OpenAI configuration
+// Import React hooks for managing component state and lifecycle
+import { useState, useRef, useEffect } from 'react'
+
+// Import Material-UI components for beautiful, pre-built UI elements
+import {
+  Box,          // Generic container component
+  Paper,        // Component with shadow/elevation effect
+  TextField,    // Text input field
+  Typography,   // For displaying text with consistent styling
+  Chip,         // Small labeled UI element
+  AppBar,       // Top navigation bar
+  Toolbar,      // Container for AppBar content
+  Container,    // Responsive layout container
+  Stack,        // Component for arranging items in a column/row
+  Avatar,       // Circular profile picture component
+  Fade,         // Animation component for fade in/out
+  Grow,         // Animation component for grow effect
+  useTheme,     // Hook to access Material-UI theme
+  alpha,        // Function to add transparency to colors
+  Tooltip,      // Popup information on hover
+  Fab,          // Floating Action Button
+  IconButton,   // Button that displays an icon
+  Select,       // Dropdown selection component
+  MenuItem,     // Individual option in a Select dropdown
+  FormControl,  // Wrapper for form controls
+  CircularProgress // Loading spinner
+} from '@mui/material'
+
+// Import Material-UI icons
+import {
+  Send as SendIcon,         // Send message icon
+  Person as PersonIcon,     // User avatar icon
+  SmartToy as BotIcon,      // AI bot icon
+  Clear as ClearIcon,       // Clear/X icon
+  AutoAwesome as SparkleIcon, // Sparkle/magic icon
+  Add as AddIcon,           // Plus/add icon
+  Delete as DeleteIcon      // Trash/delete icon
+} from '@mui/icons-material'
+
+// Import Azure OpenAI client for AI functionality
+import { AzureOpenAI } from "openai"
+
+// Import local data and services
+import shopData from './assets/MyShop.json'  // Woodworking shop data
+import { isPlexQuestion, generatePlexContext } from './ChatAgent/PlexAgent'  // Plex intelligence
+import MarkdownRenderer from './components/MarkdownRenderer'  // For formatting AI responses
+import { ConversationService, type Conversation, type ConversationMessage } from './services/conversationService'  // Database operations
+
+// Azure OpenAI configuration - connects to your AI service
 const endpoint = "https://enzol-mgr7she7-swedencentral.cognitiveservices.azure.com/";
 const modelName = "gpt-5-chat";
 const deployment = "gpt-5-chat";
 
+/**
+ * Azure OpenAI API Call Function
+ * 
+ * WHAT THIS FUNCTION DOES:
+ * This function sends your conversation to Azure OpenAI and gets an AI response back.
+ * It's like having a phone call with a very smart assistant.
+ * 
+ * HOW IT WORKS:
+ * 1. Takes an array of messages (your conversation history)
+ * 2. Sends them to Azure OpenAI's GPT-5 model
+ * 3. Gets back an AI-generated response
+ * 4. Returns that response to display in the chat
+ * 
+ * LEARNING CONCEPTS:
+ * - Async/await for handling promises
+ * - API authentication with keys
+ * - Error handling with try/catch
+ * - Working with external AI services
+ * - HTTP requests and responses
+ * 
+ * SECURITY NOTE FOR STUDENTS:
+ * In a real production app, you would NEVER put API keys directly in frontend code!
+ * This should be handled by your backend server. We're doing it here for simplicity.
+ * 
+ * @param messages - Array of conversation messages to send to AI
+ * @returns Promise that resolves to the AI's response
+ */
 export async function callAzureOpenAI(messages: Array<{role: string, content: string}>) {
+  // WARNING: In production, this API key should be on the backend!
   const apiKey = "CMAJXHUEw8cWYiD6bd6UhnjIqxYLO7FngHwiuIOkpRjcIABZKVBxJQQJ99BJACfhMk5XJ3w3AAAAACOGxNoa";
   const apiVersion = "2024-04-01-preview";
+  
+  // Configuration object for the Azure OpenAI client
   const options = { 
-    endpoint, 
-    apiKey, 
-    deployment, 
-    apiVersion,
-    dangerouslyAllowBrowser: true 
+    endpoint,     // Where to send the request
+    apiKey,       // Authentication key
+    deployment,   // Which AI model to use
+    apiVersion,   // Which version of the API
+    dangerouslyAllowBrowser: true  // Allows running in browser (normally unsafe)
   }
 
+  // Log what we're sending (helpful for debugging)
   console.log('🔧 Making API call with:', {
     endpoint: endpoint,
     deployment: deployment,
@@ -66,61 +134,127 @@ export async function callAzureOpenAI(messages: Array<{role: string, content: st
     apiVersion: apiVersion
   });
 
+  // Create the Azure OpenAI client with our configuration
   const client = new AzureOpenAI(options);
 
+  // Make the actual API call to get AI response
   const response = await client.chat.completions.create({
+    // Convert our message format to what OpenAI expects
     messages: messages.map(msg => ({
-      role: msg.role as "system" | "user" | "assistant",
+      role: msg.role as "system" | "user" | "assistant",  // TypeScript type assertion
       content: msg.content
     })),
-    max_tokens: 16384,
-    temperature: 1,
-    top_p: 1,
-    model: modelName
+    max_tokens: 16384,    // Maximum length of response
+    temperature: 1,       // Creativity level (0 = very focused, 2 = very creative)
+    top_p: 1,            // Another parameter that affects randomness
+    model: modelName     // Which AI model to use
   });
 
+  // Extract the AI's response from the API response
+  // The ?. is "optional chaining" - safely access properties that might not exist
   return response.choices[0]?.message?.content || 'No response received';
 }
 
-// Define the type for inventory items
+// ================================================================================================
+// DATA TYPES AND INTERFACES
+// ================================================================================================
+
+/**
+ * TypeScript Interface for Inventory Items
+ * 
+ * WHAT INTERFACES DO:
+ * Interfaces define the "shape" of data objects. They tell TypeScript what properties
+ * an object should have and what types those properties should be.
+ * 
+ * LEARNING BENEFIT:
+ * - Catch errors at compile time instead of runtime
+ * - Get autocomplete suggestions in your editor
+ * - Make code self-documenting
+ * 
+ * EXAMPLE: If you try to access item.Name instead of item.ProductName,
+ * TypeScript will warn you before you even run the code!
+ */
 interface InventoryItem {
-  ProductName: string;
-  Company: string;
-  Price: number | string;
-  OrderDate?: number;
-  Tags?: string;
-  SKU?: string | number;
-  [key: string]: unknown; // Remove this line if you want stricter typing
+  ProductName: string;        // Name of the product
+  Company: string;           // Which company makes it
+  Price: number | string;    // Cost (can be number or string like "$25.99")
+  OrderDate?: number;        // When it was ordered (Excel date format, optional)
+  Tags?: string;            // Categories or labels (optional)
+  SKU?: string | number;    // Stock Keeping Unit - product ID (optional)
+  [key: string]: unknown;   // Allow other properties we haven't defined
 }
 
-// Utility object for shop data analysis
+// ================================================================================================
+// SHOP DATA ANALYSIS UTILITIES
+// ================================================================================================
+
+/**
+ * Utility object for analyzing woodworking shop inventory data
+ * 
+ * PURPOSE: This object contains helper functions to analyze the shop data
+ * and provide insights like spending by year, most expensive items, etc.
+ * 
+ * LEARNING CONCEPTS:
+ * - Object methods and properties
+ * - Date manipulation in JavaScript
+ * - Array methods (filter, reduce, sort)
+ * - Error handling with try/catch
+ * - Type checking and conversions
+ */
 const analyzeShopData = {
+  /**
+   * Converts Excel date numbers to JavaScript Date objects
+   * 
+   * WHY THIS IS NEEDED: Excel stores dates as numbers (days since 1900-01-01)
+   * JavaScript uses a different date system, so we need to convert.
+   * 
+   * MATH EXPLANATION:
+   * - Excel epoch: January 1, 1900
+   * - JavaScript epoch: January 1, 1970
+   * - Difference: 25569 days
+   * - Convert to milliseconds: multiply by 86400 (seconds/day) * 1000 (ms/second)
+   */
   convertExcelDate: (excelDate: number): Date => {
-    // Excel date to JS date conversion
-    // Excel's epoch starts at 1900-01-01
     const jsDate = new Date(Math.round((excelDate - 25569) * 86400 * 1000));
     return jsDate;
   },
 
+  /**
+   * Analyzes spending for a specific year
+   * 
+   * WHAT IT DOES:
+   * 1. Filters all inventory items to find ones bought in the specified year
+   * 2. Calculates total money spent that year
+   * 3. Counts how many items were bought
+   * 4. Returns all the data for further analysis
+   * 
+   * ARRAY METHODS USED:
+   * - filter(): Creates new array with items that pass a test
+   * - reduce(): Reduces array to single value (sum of prices)
+   */
   getSpendingByYear: (year: number): { total: number, count: number, items: InventoryItem[] } => {
     try {
+      // Filter items to only include those from the specified year
       const yearItems = shopData.Inventory.filter((item: InventoryItem) => {
         try {
           const itemDate = analyzeShopData.convertExcelDate(item.OrderDate || 0)
           return itemDate.getFullYear() === year
         } catch {
-          return false
+          return false  // If date conversion fails, exclude this item
         }
       })
       
+      // Calculate total spending using reduce()
       const total = yearItems.reduce((sum, item) => {
+        // Handle both number and string prices
         const price = typeof item.Price === 'number' ? item.Price : parseFloat(item.Price) || 0
         return sum + price
       }, 0)
+      
       return { total, count: yearItems.length, items: yearItems }
     } catch (error) {
       console.error('Error in getSpendingByYear:', error)
-      return { total: 0, count: 0, items: [] }
+      return { total: 0, count: 0, items: [] }  // Return safe defaults on error
     }
   },
 
@@ -280,19 +414,67 @@ const generateShopContext = (question: string): string => {
   return context
 }
 
-// ConversationMessage interface is now imported from conversationService
+// ================================================================================================
+// MAIN CHAT APPLICATION COMPONENT
+// ================================================================================================
 
+/**
+ * ChatApp - The Main Chat Interface Component
+ * 
+ * THIS IS THE HEART OF THE APPLICATION! This React component manages:
+ * 
+ * 1. 💬 CHAT INTERFACE: Display messages and handle user input
+ * 2. 🧠 AI INTEGRATION: Send messages to Azure OpenAI and get responses
+ * 3. 💾 CONVERSATION MANAGEMENT: Save, load, switch between conversations
+ * 4. 🎬 PLEX INTELLIGENCE: Enhance movie questions with library context
+ * 5. 🔨 SHOP DATA: Answer questions about woodworking inventory
+ * 
+ * REACT CONCEPTS FOR STUDENTS:
+ * - useState: For managing component state (messages, loading states, etc.)
+ * - useEffect: For side effects (loading data, auto-scrolling, auto-saving)
+ * - useRef: For direct DOM access (scrolling to bottom)
+ * - Event handlers: Functions that run when user clicks, types, etc.
+ * - Conditional rendering: Show different UI based on state
+ * - Component lifecycle: What happens when component mounts, updates, unmounts
+ * 
+ * STATE MANAGEMENT EXPLANATION:
+ * React components re-render when state changes. Think of state as the component's memory.
+ * When you type a message, we update the `question` state, which causes React to re-render
+ * and show your typed text on screen.
+ */
 export default function ChatApp() {
+  // ============================================================================================
+  // STATE VARIABLES - The component's memory
+  // ============================================================================================
+  
+  // Current message being typed
   const [question, setQuestion] = useState('')
+  
+  // Whether we're waiting for AI response
   const [loading, setLoading] = useState(false)
+  
+  // Array of messages in current conversation
   const [conversation, setConversation] = useState<ConversationMessage[]>([])
+  
+  // List of all saved conversations
   const [conversations, setConversations] = useState<Conversation[]>([])
+  
+  // ID of currently active conversation
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null)
+  
+  // Whether we're loading conversations from database
   const [loadingConversations, setLoadingConversations] = useState(true)
+  
+  // Whether we're saving current conversation
   const [savingConversation, setSavingConversation] = useState(false)
+  
+  // Reference to the bottom of messages (for auto-scrolling)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Debug: Azure OpenAI GPT-5 configuration
+  // ============================================================================================
+  // DEBUG LOGGING - Help us understand what's happening
+  // ============================================================================================
+  
   console.log('=== Azure OpenAI Configuration ===')
   console.log('Endpoint:', endpoint)
   console.log('Model Name:', modelName)
@@ -300,39 +482,53 @@ export default function ChatApp() {
   console.log('API Version:', '2024-04-01-preview')
   console.log('==================================')
   
-  // Debug: Log button state
+  // Calculate if send button should be disabled
   const isButtonDisabled = loading || !question.trim()
   console.log('Button disabled:', isButtonDisabled, 'Loading:', loading, 'Question length:', question.length, 'Question trimmed:', question.trim().length)
 
-  // Load conversations on component mount
+  // ============================================================================================
+  // REACT EFFECTS - Side effects that happen at specific times
+  // ============================================================================================
+  
+  // EFFECT 1: Load conversations when component first mounts
   useEffect(() => {
     loadConversations()
-  }, [])
+  }, [])  // Empty dependency array = run once on mount
 
-  // Auto-scroll to bottom when new messages are added
+  // EFFECT 2: Auto-scroll to bottom when new messages appear
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [conversation, loading])
+  }, [conversation, loading])  // Run when conversation or loading changes
 
-  // Auto-save conversation when messages change (debounced)
+  // EFFECT 3: Auto-save conversation when messages change (with debouncing)
   useEffect(() => {
     if (currentConversationId && conversation.length > 0) {
+      // Debouncing: Wait 2 seconds after last change before saving
+      // This prevents saving on every single keystroke
       const saveTimer = setTimeout(() => {
         saveCurrentConversation()
-      }, 2000) // Save 2 seconds after last change
+      }, 2000)
 
+      // Cleanup function: Cancel the timer if component unmounts or dependencies change
       return () => clearTimeout(saveTimer)
     }
   }, [conversation, currentConversationId])
 
-  // Load all conversations
+  // ============================================================================================
+  // CONVERSATION MANAGEMENT FUNCTIONS
+  // ============================================================================================
+  
+  /**
+   * Load all conversations from the database
+   * This runs when the app starts up
+   */
   const loadConversations = async () => {
     try {
       setLoadingConversations(true)
       const loadedConversations = await ConversationService.getAllConversations()
       setConversations(loadedConversations)
       
-      // If no current conversation, create a new one
+      // If no current conversation and no saved conversations, create a new one
       if (!currentConversationId && loadedConversations.length === 0) {
         await createNewConversation()
       }
@@ -383,17 +579,38 @@ export default function ChatApp() {
 
   // Delete a conversation
   const deleteConversation = async (conversationId: number) => {
+    // Add confirmation dialog
+    const confirmed = window.confirm('Are you sure you want to delete this conversation? This action cannot be undone.')
+    if (!confirmed) {
+      return
+    }
+
     try {
+      console.log('Attempting to delete conversation:', conversationId)
       await ConversationService.deleteConversation(conversationId)
+      console.log('Conversation deleted successfully')
       
-      // If we deleted the current conversation, create a new one
+      // If we deleted the current conversation, clear the state
       if (conversationId === currentConversationId) {
-        await createNewConversation()
+        console.log('Deleted current conversation, clearing state')
+        setCurrentConversationId(null)
+        setConversation([])
       }
       
-      await loadConversations()
+      console.log('Reloading conversations list')
+      const updatedConversations = await ConversationService.getAllConversations()
+      setConversations(updatedConversations)
+      console.log('Conversations reloaded, count:', updatedConversations.length)
+      
+      // Only create a new conversation if no conversations exist
+      if (updatedConversations.length === 0) {
+        console.log('No conversations exist, creating new one')
+        await createNewConversation()
+      }
     } catch (error) {
       console.error('Failed to delete conversation:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      alert(`Failed to delete conversation: ${errorMessage}`)
     }
   }
 

@@ -1,84 +1,188 @@
+/**
+ * MyShopTools.tsx - Woodworking Shop Inventory Management System
+ * 
+ * WHAT THIS COMPONENT DOES:
+ * This is a comprehensive tool management system for a woodworking shop that provides:
+ * 1. 🔍 SEARCH & FILTER: Find tools by name, company, SKU, tags, or price range
+ * 2. 📋 INVENTORY DISPLAY: View all tools in a card-based grid layout
+ * 3. ➕ ADD NEW TOOLS: Create new tool entries with images and details
+ * 4. ✏️ EDIT EXISTING: Update tool information and specifications
+ * 5. 🗑️ DELETE TOOLS: Remove tools from inventory with confirmation
+ * 6. 🖼️ IMAGE MANAGEMENT: Upload and display tool photos
+ * 7. 💾 DATABASE SYNC: Real-time synchronization with MySQL backend
+ * 8. 📱 RESPONSIVE DESIGN: Works seamlessly on mobile and desktop
+ * 
+ * LEARNING CONCEPTS FOR STUDENTS:
+ * - Advanced React state management with multiple useState hooks
+ * - useEffect for side effects (data loading, image uploads)
+ * - useMemo for performance optimization (expensive calculations)
+ * - useCallback for preventing unnecessary re-renders
+ * - Complex form handling with validation
+ * - File upload and image processing
+ * - RESTful API integration (GET, POST, PUT, DELETE)
+ * - Search and filtering algorithms
+ * - Modal dialogs and user interactions
+ * - Error handling and user feedback
+ * - TypeScript interfaces for data modeling
+ * - Material-UI advanced component usage
+ * 
+ * REAL-WORLD APPLICATION:
+ * This demonstrates a complete CRUD (Create, Read, Update, Delete) application
+ * that could be used by any small business for inventory management.
+ * 
+ * DATA FLOW ARCHITECTURE:
+ * ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+ * │   MyShopTools   │───▶│   MySQL DB      │───▶│  Image Storage  │
+ * │   (Frontend)    │    │   (Backend)     │    │   (File System) │
+ * └─────────────────┘    └─────────────────┘    └─────────────────┘
+ *         │                       │                       │
+ *         ▼                       ▼                       ▼
+ * ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+ * │ User Interface  │    │ RESTful API     │    │ Image URLs      │
+ * │ (Cards, Forms)  │    │ (CRUD Ops)      │    │ (Display)       │
+ * └─────────────────┘    └─────────────────┘    └─────────────────┘
+ */
+
+// Import React hooks for component functionality
 import { useState, useEffect, useMemo, useCallback } from 'react'
+
+// Import Material-UI components for beautiful, consistent UI
 import {
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Container,
-  Dialog,
-  DialogContent,
-  DialogActions,
-  IconButton,
-  InputAdornment,
-  Paper,
-  TextField,
-  Typography,
-  Chip,
-  Skeleton,
-  Alert,
-  Snackbar,
-  Stack,
+  Box,              // Generic container for layout
+  Button,           // Clickable action buttons
+  Card,             // Container with elevation/shadow
+  CardContent,      // Content area inside cards
+  Container,        // Responsive layout container
+  Dialog,           // Modal popup windows
+  DialogContent,    // Content area in dialogs
+  DialogActions,    // Button area in dialogs
+  IconButton,       // Buttons that display icons
+  InputAdornment,   // Icons/text inside input fields
+  Paper,            // Surface with Material Design elevation
+  TextField,        // Text input fields with labels
+  Typography,       // Text display with consistent styling
+  Chip,             // Small labeled UI elements
+  Skeleton,         // Loading placeholder animation
+  Alert,            // Status/notification messages
+  Snackbar,         // Toast notifications
+  Stack,            // Component for arranging items
 } from '@mui/material'
+
+// Import Material-UI icons for visual elements
 import {
-  ArrowBack,
-  Inventory,
-  LocationOn,
-  AttachMoney,
-  Tag as TagIcon,
-  CalendarMonth,
-  Launch,
-  Business,
-  Add,
-  Edit,
-  Delete,
-  Save,
-  Close,
-  Image as ImageIcon,
-  CloudUpload,
-  Cancel,
-  Search,
+  ArrowBack,        // Back navigation arrow
+  Inventory,        // Inventory/storage icon
+  LocationOn,       // Location/place icon
+  AttachMoney,      // Money/price icon
+  Tag as TagIcon,   // Tag/label icon
+  CalendarMonth,    // Calendar/date icon
+  Launch,           // External link icon
+  Business,         // Company/business icon
+  Add,              // Plus/add icon
+  Edit,             // Edit/pencil icon
+  Delete,           // Trash/delete icon
+  Save,             // Save/floppy disk icon
+  Close,            // X/close icon
+  Image as ImageIcon,    // Image/photo icon
+  CloudUpload,      // Upload cloud icon
+  Cancel,           // Cancel/X icon
+  Search,           // Search/magnifying glass icon
 } from '@mui/icons-material'
 
-// Define the Tool type based on the expected structure from MySQL database
+// ============================================================================================
+// TYPESCRIPT INTERFACES - Data structure definitions
+// ============================================================================================
+
+/**
+ * Tool Interface - Defines the structure of a tool object
+ * 
+ * WHAT INTERFACES DO: They define the "shape" of data objects, ensuring type safety
+ * and providing autocomplete in your IDE. If you try to access a property that
+ * doesn't exist, TypeScript will warn you before you even run the code!
+ * 
+ * DATABASE RELATIONSHIP: This interface matches the MySQL database table structure
+ * - id: Auto-increment primary key (optional for new items)
+ * - item_id: Legacy identifier from original Excel data
+ * - product_name: The name of the tool
+ * - company: Manufacturer or brand name
+ * - sku: Stock Keeping Unit (product identifier)
+ * - tags: Categories or keywords for searching
+ * - price: Cost of the tool in dollars
+ */
 type Tool = {
-  id?: number // MySQL auto-increment ID
-  item_id: number
-  product_name: string
-  company?: string
-  sku?: string
-  tags?: string
-  price: number
-  qty?: number
-  purchased?: string
-  order_number?: number
-  barcode?: string
-  location?: string
-  sub_location?: string
-  order_date?: number
-  product_detail?: string
-  notes?: string
-  html_link?: string
-  full_url?: string
-  base_url?: string
-  sku_on_website?: string
-  spare2?: string
+  id?: number           // MySQL auto-increment ID (optional - generated by database)
+  item_id: number       // Legacy item identifier
+  product_name: string  // Name of the tool/product
+  company?: string      // Manufacturer/brand (optional)
+  sku?: string         // Stock Keeping Unit (optional)
+  tags?: string        // Categories/keywords (optional)
+  price: number        // Cost in dollars
+  qty?: number         // Quantity in stock (optional)
+  purchased?: string   // Purchase status/info (optional)
+  order_number?: number // Order reference number (optional)
+  barcode?: string     // Product barcode (optional)
+  location?: string    // Storage location (optional)
+  sub_location?: string // Specific storage sublocation (optional)
+  order_date?: number  // When item was ordered (Excel date format, optional)
+  product_detail?: string // Detailed description (optional)
+  notes?: string       // Additional notes (optional)
+  html_link?: string   // Product webpage link (optional)
+  full_url?: string    // Complete product URL (optional)
+  base_url?: string    // Base website URL (optional)
+  sku_on_website?: string // SKU as it appears on vendor website (optional)
+  spare2?: string      // Extra field for future use (optional)
 }
 
+/**
+ * ToolImage Interface - Defines the structure of tool image metadata
+ * 
+ * PURPOSE: Tracks uploaded images associated with tools
+ * RELATIONSHIP: Each tool can have multiple images (one-to-many relationship)
+ */
 type ToolImage = {
-  id: number
-  inventory_id: number
-  image_name: string
-  image_type: string
-  image_size: number
-  uploaded_at: string
+  id: number              // Unique image ID
+  inventory_id: number    // Which tool this image belongs to
+  image_name: string      // Original filename
+  image_type: string      // File type (jpg, png, etc.)
+  image_size: number      // File size in bytes
+  uploaded_at: string     // When image was uploaded
 }
 
+// ============================================================================================
+// MAIN COMPONENT - MyShopTools Inventory Management System
+// ============================================================================================
+
+/**
+ * MyShopTools Component - Complete inventory management system
+ * 
+ * This component manages the entire lifecycle of tool inventory:
+ * - Loading tools from database
+ * - Displaying tools in searchable grid
+ * - Adding new tools with image upload
+ * - Editing existing tool details
+ * - Deleting tools with confirmation
+ * - Real-time search and filtering
+ * 
+ * REACT PATTERNS DEMONSTRATED:
+ * - Multiple useState hooks for different types of state
+ * - useEffect for data loading and side effects
+ * - useMemo for expensive computations (filtering)
+ * - useCallback for optimized event handlers
+ * - Custom hooks patterns (could be extracted)
+ */
 export default function MyShopTools() {
-  const [tools, setTools] = useState<Tool[]>([])
-  const [selectedTool, setSelectedTool] = useState<Tool | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // ============================================================================================
+  // STATE MANAGEMENT - Component's memory and data
+  // ============================================================================================
+  
+  // Core data state
+  const [tools, setTools] = useState<Tool[]>([])              // Array of all tools
+  const [selectedTool, setSelectedTool] = useState<Tool | null>(null)  // Currently selected tool for editing
+  
+  // UI state
+  const [searchTerm, setSearchTerm] = useState('')            // Current search query
+  const [loading, setLoading] = useState(true)               // Whether we're loading data
+  const [error, setError] = useState<string | null>(null)    // Any error messages
   const [isEditing, setIsEditing] = useState(false)
   const [isAdding, setIsAdding] = useState(false)
   const [editForm, setEditForm] = useState<Partial<Tool>>({})

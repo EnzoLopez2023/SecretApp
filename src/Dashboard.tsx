@@ -1,39 +1,127 @@
-import React from 'react';
-import {
-  Box,
-  AppBar,
-  Toolbar,
-  Typography,
-  Card,
-  CardContent,
-  Button,
-} from '@mui/material';
-import {
-  Chat as ChatIcon,
-  Store as StoreIcon,
-  Movie as MovieIcon,
-  Carpenter as CarpenterIcon,
-  TableChart as ConverterIcon,
-  AccountCircle as AccountIcon,
-} from '@mui/icons-material';
-import { useMsal } from '@azure/msal-react';
-import NavigationSidebar from './NavigationSidebar';
-import VersionDisplay from './components/VersionDisplay';
+/**
+ * Dashboard.tsx - Homepage and Main Landing Page
+ * 
+ * WHAT THIS COMPONENT DOES:
+ * This is the "homepage" of the application that users see when they first log in.
+ * It provides:
+ * 1. 🏠 WELCOME SCREEN: Personalized greeting with user information
+ * 2. 🧭 NAVIGATION CARDS: Visual way to access different app features
+ * 3. 📊 OVERVIEW: Quick access to all main application modules
+ * 4. 👤 USER INFO: Display logged-in user details from Azure authentication
+ * 5. 📱 RESPONSIVE LAYOUT: Works on both desktop and mobile devices
+ * 
+ * LEARNING CONCEPTS FOR STUDENTS:
+ * - React props (receiving data from parent component)
+ * - TypeScript interfaces (defining component prop types)
+ * - Conditional rendering (only show when currentView is 'dashboard')
+ * - Material-UI Grid system for responsive layouts
+ * - Event handling (onClick navigation)
+ * - Azure MSAL authentication integration
+ * - Component composition and reusability
+ * 
+ * USER EXPERIENCE FLOW:
+ * 1. User logs in through Azure authentication
+ * 2. Dashboard appears with personalized welcome
+ * 3. User sees cards for each app feature
+ * 4. User clicks a card to navigate to that feature
+ * 5. Dashboard hides and selected feature appears
+ */
 
+// Import React (required for JSX)
+import React from 'react';
+
+// Import Material-UI components for beautiful UI
+import {
+  Box,           // Generic container component
+  AppBar,        // Top navigation bar
+  Toolbar,       // Container for AppBar content
+  Typography,    // Text display with consistent styling
+  Card,          // Container with shadow/elevation effect
+  CardContent,   // Content area inside a Card
+  Button,        // Clickable button component
+} from '@mui/material';
+
+// Import Material-UI icons for visual elements
+import {
+  Chat as ChatIcon,           // Chat/message icon
+  Store as StoreIcon,         // Shop/store icon
+  Movie as MovieIcon,         // Movie/film icon
+  Carpenter as CarpenterIcon, // Woodworking/tools icon
+  TableChart as ConverterIcon,// Data/spreadsheet icon
+  AccountCircle as AccountIcon, // User profile icon
+} from '@mui/icons-material';
+
+// Import Azure authentication hook
+import { useMsal } from '@azure/msal-react';
+
+// Import other components
+import NavigationSidebar from './NavigationSidebar';  // Left sidebar navigation
+import VersionDisplay from './components/VersionDisplay';  // App version info
+
+// ============================================================================================
+// TYPESCRIPT INTERFACES - Define the shape of data this component expects
+// ============================================================================================
+
+/**
+ * AppView Type - All possible pages in the application
+ * This must match the same type definition in App.tsx
+ */
 type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter';
 
+/**
+ * DashboardProps Interface - Defines what props this component receives
+ * 
+ * LEARNING POINT: Props are how parent components pass data to child components
+ * Think of props like function parameters, but for React components
+ */
 interface DashboardProps {
-  currentView: AppView;
-  onNavigate: (view: AppView) => void;
+  currentView: AppView;                      // Which page is currently active
+  onNavigate: (view: AppView) => void;       // Function to change the current page
 }
 
+/**
+ * Dashboard Component - The main homepage component
+ * 
+ * REACT COMPONENT EXPLANATION:
+ * This is a "functional component" - it's literally a function that returns JSX
+ * JSX is a syntax that looks like HTML but is actually JavaScript
+ * 
+ * PROPS DESTRUCTURING:
+ * { currentView, onNavigate } extracts these properties from the props object
+ * Instead of: function Dashboard(props) { const currentView = props.currentView; ... }
+ * We can write: function Dashboard({ currentView, onNavigate }) { ... }
+ */
 export default function Dashboard({ currentView, onNavigate }: DashboardProps) {
+  // ============================================================================================
+  // AZURE AUTHENTICATION - Get user information
+  // ============================================================================================
+  
+  /**
+   * Azure MSAL Hook - Get authentication information
+   * 
+   * WHAT THIS DOES: useMsal() gives us access to user authentication data
+   * The 'accounts' array contains information about logged-in users
+   */
   const { accounts } = useMsal();
 
+  // Extract user information from the first (primary) account
   const account = accounts[0];
-  const userName = account?.name || 'User';
-  const userEmail = account?.username || '';
+  const userName = account?.name || 'User';        // User's display name, or 'User' if not available
+  const userEmail = account?.username || '';       // User's email address
 
+  // ============================================================================================
+  // NAVIGATION MENU CONFIGURATION
+  // ============================================================================================
+  
+  /**
+   * Menu Items Array - Configuration for dashboard navigation cards
+   * 
+   * LEARNING CONCEPTS:
+   * - Array of objects (each object represents one navigation card)
+   * - Object properties (id, label, icon, color)
+   * - JSX elements stored in variables (icon property contains React elements)
+   * - Color theming for visual differentiation
+   */
   const menuItems = [
     { id: 'chat', label: 'AI Assistant', icon: <ChatIcon />, color: '#4CAF50' },
     { id: 'shop', label: 'Shop Tools Manager', icon: <StoreIcon />, color: '#6366f1' },
@@ -42,10 +130,27 @@ export default function Dashboard({ currentView, onNavigate }: DashboardProps) {
     { id: 'converter', label: 'Data Converter', icon: <ConverterIcon />, color: '#9c27b0' },
   ];
 
+  // ============================================================================================
+  // CONDITIONAL RENDERING - Only show dashboard on the dashboard page
+  // ============================================================================================
+  
+  /**
+   * Early Return Pattern
+   * 
+   * WHAT THIS DOES: If we're not on the dashboard page, return null (render nothing)
+   * WHY: The Dashboard component is always mounted in App.tsx, but we only want to 
+   * show it when the user is actually on the dashboard page
+   * 
+   * LEARNING POINT: Returning null from a React component makes it invisible
+   */
   if (currentView !== 'dashboard') {
     return null; // Don't render dashboard when on other pages
   }
 
+  // ============================================================================================
+  // MAIN RENDER - What gets displayed when component is visible
+  // ============================================================================================
+  
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       {/* Navigation Sidebar */}
