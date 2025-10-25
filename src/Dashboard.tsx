@@ -48,6 +48,7 @@ import {
   Movie as MovieIcon,         // Movie/film icon
   Carpenter as CarpenterIcon, // Woodworking/tools icon
   TableChart as ConverterIcon,// Data/spreadsheet icon
+  HomeRepairService as MaintenanceIcon, // Home maintenance icon
   AccountCircle as AccountIcon, // User profile icon
 } from '@mui/icons-material';
 
@@ -66,7 +67,7 @@ import VersionDisplay from './components/VersionDisplay';  // App version info
  * AppView Type - All possible pages in the application
  * This must match the same type definition in App.tsx
  */
-type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter' | 'plex-api' | 'playlist-creator';
+type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter' | 'plex-api' | 'playlist-creator' | 'home-maintenance';
 
 /**
  * DashboardProps Interface - Defines what props this component receives
@@ -125,6 +126,7 @@ export default function Dashboard({ currentView, onNavigate }: DashboardProps) {
   const menuItems = [
     { id: 'chat', label: 'AI Assistant', icon: <ChatIcon />, color: '#4CAF50' },
     { id: 'shop', label: 'Shop Tools Manager', icon: <StoreIcon />, color: '#6366f1' },
+    { id: 'home-maintenance', label: 'Home Maintenance', icon: <MaintenanceIcon />, color: '#10b981' },
     { id: 'woodworking', label: 'Project Workshop', icon: <CarpenterIcon />, color: '#f59e0b' },
     { id: 'halloween', label: 'Media Library', icon: <MovieIcon />, color: '#ff9800' },
     { id: 'converter', label: 'Data Converter', icon: <ConverterIcon />, color: '#9c27b0' },

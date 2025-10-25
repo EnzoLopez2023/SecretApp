@@ -1370,6 +1370,773 @@ app.delete('/api/inventory/images/:imageId', async (req, res) => {
 })
 
 // ============================================
+// HOME MAINTENANCE TRACKER API ENDPOINTS
+// ============================================
+
+// Helper function to format dates for MySQL
+function formatDateForMySQL(dateString) {
+  if (!dateString) return null;
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return null;
+    
+    // Format as MySQL DATETIME: YYYY-MM-DD HH:MM:SS
+    return date.toISOString().slice(0, 19).replace('T', ' ');
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return null;
+  }
+}
+
+// Get all home items with optional filtering
+app.get('/api/maintenance/items', async (req, res) => {
+  try {
+    const { category, location, search } = req.query
+    
+    let query = 'SELECT * FROM home_items'
+    const params = []
+    const conditions = []
+    
+    if (category) {
+      conditions.push('category = ?')
+      params.push(category)
+    }
+    
+    if (location) {
+      conditions.push('location LIKE ?')
+      params.push(`%${location}%`)
+    }
+    
+    if (search) {
+      conditions.push('(name LIKE ? OR description LIKE ? OR manufacturer LIKE ?)')
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`)
+    }
+    
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ')
+    }
+    
+    query += ' ORDER BY name ASC'
+    
+    const [items] = await pool.query(query, params)
+    res.json(items)
+  } catch (error) {
+    console.error('Get items error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Get a specific home item by ID
+app.get('/api/maintenance/items/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    const [[item]] = await pool.query('SELECT * FROM home_items WHERE id = ?', [id])
+    
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' })
+    }
+    
+    res.json(item)
+  } catch (error) {
+    console.error('Get item error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Create a new home item
+app.post('/api/maintenance/items', async (req, res) => {
+  try {
+    const {
+      name,
+      category,
+      location,
+      description,
+      purchase_date,
+      installation_date,
+      manufacturer,
+      model_number,
+      serial_number,
+      estimated_lifespan_years,
+      replacement_cost
+    } = req.body
+    
+    if (!name || !category) {
+      return res.status(400).json({ error: 'Name and category are required' })
+    }
+    
+    const [result] = await pool.query(
+      `INSERT INTO home_items (
+        name, category, location, description, purchase_date, installation_date,
+        manufacturer, model_number, serial_number, estimated_lifespan_years, replacement_cost
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, category, location, description, formatDateForMySQL(purchase_date), formatDateForMySQL(installation_date), 
+       manufacturer, model_number, serial_number, estimated_lifespan_years, replacement_cost]
+    )
+    
+    const [[newItem]] = await pool.query('SELECT * FROM home_items WHERE id = ?', [result.insertId])
+    res.status(201).json(newItem)
+  } catch (error) {
+    console.error('Create item error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Update a home item
+app.put('/api/maintenance/items/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    const {
+      name,
+      category,
+      location,
+      description,
+      purchase_date,
+      installation_date,
+      manufacturer,
+      model_number,
+      serial_number,
+      estimated_lifespan_years,
+      replacement_cost
+    } = req.body
+    
+    const [result] = await pool.query(
+      `UPDATE home_items SET
+        name = ?, category = ?, location = ?, description = ?, purchase_date = ?,
+        installation_date = ?, manufacturer = ?, model_number = ?, serial_number = ?,
+        estimated_lifespan_years = ?, replacement_cost = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?`,
+      [name, category, location, description, purchase_date, installation_date,
+       manufacturer, model_number, serial_number, estimated_lifespan_years, replacement_cost, id]
+    )
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Item not found' })
+    }
+    
+    const [[updatedItem]] = await pool.query('SELECT * FROM home_items WHERE id = ?', [id])
+    res.json(updatedItem)
+  } catch (error) {
+    console.error('Update item error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Delete a home item
+app.delete('/api/maintenance/items/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    const [result] = await pool.query('DELETE FROM home_items WHERE id = ?', [id])
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Item not found' })
+    }
+    
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Delete item error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Get maintenance tasks with optional filtering
+app.get('/api/maintenance/tasks', async (req, res) => {
+  try {
+    const { status, priority, item_id, due_soon } = req.query
+    
+    let query = `
+      SELECT t.*, i.name as item_name, i.location as item_location 
+      FROM maintenance_tasks t 
+      LEFT JOIN home_items i ON t.item_id = i.id
+    `
+    const params = []
+    const conditions = []
+    
+    if (status) {
+      conditions.push('t.status = ?')
+      params.push(status)
+    }
+    
+    if (priority) {
+      conditions.push('t.priority = ?')
+      params.push(priority)
+    }
+    
+    if (item_id) {
+      conditions.push('t.item_id = ?')
+      params.push(item_id)
+    }
+    
+    if (due_soon === 'true') {
+      conditions.push('t.due_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)')
+    }
+    
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ')
+    }
+    
+    query += ' ORDER BY t.due_date ASC, t.priority DESC'
+    
+    const [tasks] = await pool.query(query, params)
+    res.json(tasks)
+  } catch (error) {
+    console.error('Get tasks error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Create a new maintenance task
+app.post('/api/maintenance/tasks', async (req, res) => {
+  try {
+    const {
+      item_id,
+      title,
+      description,
+      task_type,
+      priority,
+      scheduled_date,
+      due_date,
+      estimated_duration_hours,
+      recurring_interval_days,
+      assigned_to,
+      notes
+    } = req.body
+    
+    if (!title || !item_id) {
+      return res.status(400).json({ error: 'Title and item_id are required' })
+    }
+    
+    // Calculate next_due_date if recurring
+    let next_due_date = null
+    if (recurring_interval_days && due_date) {
+      const dueDate = new Date(due_date)
+      dueDate.setDate(dueDate.getDate() + recurring_interval_days)
+      next_due_date = formatDateForMySQL(dueDate.toISOString())
+    }
+    
+    const [result] = await pool.query(
+      `INSERT INTO maintenance_tasks (
+        item_id, title, description, task_type, priority, scheduled_date, due_date,
+        estimated_duration_hours, recurring_interval_days, next_due_date, assigned_to, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [item_id, title, description, task_type, priority, formatDateForMySQL(scheduled_date), formatDateForMySQL(due_date),
+       estimated_duration_hours, recurring_interval_days, next_due_date, assigned_to, notes]
+    )
+    
+    const [[newTask]] = await pool.query(
+      'SELECT t.*, i.name as item_name FROM maintenance_tasks t LEFT JOIN home_items i ON t.item_id = i.id WHERE t.id = ?',
+      [result.insertId]
+    )
+    res.status(201).json(newTask)
+  } catch (error) {
+    console.error('Create task error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Update a maintenance task
+app.put('/api/maintenance/tasks/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    const {
+      title,
+      description,
+      task_type,
+      priority,
+      status,
+      scheduled_date,
+      due_date,
+      completed_date,
+      estimated_duration_hours,
+      actual_duration_hours,
+      recurring_interval_days,
+      assigned_to,
+      notes
+    } = req.body
+    
+    // Calculate next_due_date if task is completed and recurring
+    let next_due_date = null
+    if (status === 'Completed' && recurring_interval_days && completed_date) {
+      const completedDate = new Date(completed_date)
+      completedDate.setDate(completedDate.getDate() + recurring_interval_days)
+      next_due_date = formatDateForMySQL(completedDate.toISOString())
+    }
+    
+    const [result] = await pool.query(
+      `UPDATE maintenance_tasks SET
+        title = ?, description = ?, task_type = ?, priority = ?, status = ?,
+        scheduled_date = ?, due_date = ?, completed_date = ?, estimated_duration_hours = ?,
+        actual_duration_hours = ?, recurring_interval_days = ?, next_due_date = ?,
+        assigned_to = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?`,
+      [title, description, task_type, priority, status, formatDateForMySQL(scheduled_date), formatDateForMySQL(due_date),
+       formatDateForMySQL(completed_date), estimated_duration_hours, actual_duration_hours, recurring_interval_days,
+       next_due_date, assigned_to, notes, id]
+    )
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Task not found' })
+    }
+    
+    // If task is completed and recurring, create next occurrence
+    if (status === 'Completed' && recurring_interval_days && next_due_date) {
+      await pool.query(
+        `INSERT INTO maintenance_tasks (
+          item_id, title, description, task_type, priority, due_date,
+          estimated_duration_hours, recurring_interval_days, assigned_to, notes
+        ) SELECT 
+          item_id, title, description, task_type, priority, ?,
+          estimated_duration_hours, recurring_interval_days, assigned_to, notes
+        FROM maintenance_tasks WHERE id = ?`,
+        [next_due_date, id]
+      )
+    }
+    
+    const [[updatedTask]] = await pool.query(
+      'SELECT t.*, i.name as item_name FROM maintenance_tasks t LEFT JOIN home_items i ON t.item_id = i.id WHERE t.id = ?',
+      [id]
+    )
+    res.json(updatedTask)
+  } catch (error) {
+    console.error('Update task error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Get warranties for items
+app.get('/api/maintenance/warranties', async (req, res) => {
+  try {
+    const { item_id, active_only } = req.query
+    
+    let query = `
+      SELECT w.*, i.name as item_name 
+      FROM warranties w 
+      LEFT JOIN home_items i ON w.item_id = i.id
+    `
+    const params = []
+    const conditions = []
+    
+    if (item_id) {
+      conditions.push('w.item_id = ?')
+      params.push(item_id)
+    }
+    
+    if (active_only === 'true') {
+      conditions.push('w.is_active = TRUE AND w.end_date >= CURDATE()')
+    }
+    
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ')
+    }
+    
+    query += ' ORDER BY w.end_date ASC'
+    
+    const [warranties] = await pool.query(query, params)
+    res.json(warranties)
+  } catch (error) {
+    console.error('Get warranties error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Create a new warranty
+app.post('/api/maintenance/warranties', async (req, res) => {
+  try {
+    const {
+      item_id,
+      warranty_type,
+      provider,
+      warranty_number,
+      start_date,
+      end_date,
+      coverage_description,
+      claim_process,
+      contact_info
+    } = req.body
+    
+    if (!item_id || !warranty_type || !provider) {
+      return res.status(400).json({ error: 'Item ID, warranty type, and provider are required' })
+    }
+    
+    const [result] = await pool.query(
+      `INSERT INTO warranties (
+        item_id, warranty_type, provider, warranty_number, start_date, end_date,
+        coverage_description, claim_process, contact_info
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [item_id, warranty_type, provider, warranty_number, start_date, end_date,
+       coverage_description, claim_process, contact_info]
+    )
+    
+    const [[newWarranty]] = await pool.query(
+      'SELECT w.*, i.name as item_name FROM warranties w LEFT JOIN home_items i ON w.item_id = i.id WHERE w.id = ?',
+      [result.insertId]
+    )
+    res.status(201).json(newWarranty)
+  } catch (error) {
+    console.error('Create warranty error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Get maintenance photos
+app.get('/api/maintenance/photos/:item_id', async (req, res) => {
+  try {
+    const { item_id } = req.params
+    const [photos] = await pool.query(
+      'SELECT id, item_id, task_id, photo_name, photo_type, photo_size, photo_category, description, taken_date, ai_analyzed, ai_description, ai_tags FROM maintenance_photos WHERE item_id = ? ORDER BY taken_date DESC',
+      [item_id]
+    )
+    res.json(photos)
+  } catch (error) {
+    console.error('Get photos error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Upload a maintenance photo
+app.post('/api/maintenance/photos/:item_id', async (req, res) => {
+  try {
+    const { item_id } = req.params
+    const { photo_name, photo_data, photo_type, photo_category, description, task_id } = req.body
+    
+    if (!photo_name || !photo_data || !photo_type) {
+      return res.status(400).json({ error: 'Photo name, data, and type are required' })
+    }
+    
+    // Verify item exists
+    const [[item]] = await pool.query('SELECT id FROM home_items WHERE id = ?', [item_id])
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' })
+    }
+    
+    // Convert base64 to buffer
+    const photoBuffer = Buffer.from(photo_data.replace(/^data:image\/[a-z]+;base64,/, ''), 'base64')
+    
+    const [result] = await pool.query(
+      'INSERT INTO maintenance_photos (item_id, task_id, photo_name, photo_data, photo_type, photo_size, photo_category, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [item_id, task_id || null, photo_name, photoBuffer, photo_type, photoBuffer.length, photo_category || 'General', description]
+    )
+    
+    const [[newPhoto]] = await pool.query(
+      'SELECT id, item_id, task_id, photo_name, photo_type, photo_size, photo_category, description, taken_date FROM maintenance_photos WHERE id = ?',
+      [result.insertId]
+    )
+    
+    res.status(201).json(newPhoto)
+  } catch (error) {
+    console.error('Upload photo error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Get a specific maintenance photo
+app.get('/api/maintenance/photos/image/:photo_id', async (req, res) => {
+  try {
+    const { photo_id } = req.params
+    
+    const [[photo]] = await pool.query(
+      'SELECT photo_name, photo_data, photo_type FROM maintenance_photos WHERE id = ?',
+      [photo_id]
+    )
+    
+    if (!photo) {
+      return res.status(404).json({ error: 'Photo not found' })
+    }
+    
+    res.setHeader('Content-Type', photo.photo_type)
+    res.setHeader('Content-Disposition', `inline; filename="${photo.photo_name}"`)
+    res.send(photo.photo_data)
+  } catch (error) {
+    console.error('Get photo error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Get maintenance costs
+app.get('/api/maintenance/costs', async (req, res) => {
+  try {
+    const { item_id, task_id, year, month } = req.query
+    
+    let query = `
+      SELECT c.*, i.name as item_name, t.title as task_title
+      FROM maintenance_costs c 
+      LEFT JOIN home_items i ON c.item_id = i.id
+      LEFT JOIN maintenance_tasks t ON c.task_id = t.id
+    `
+    const params = []
+    const conditions = []
+    
+    if (item_id) {
+      conditions.push('c.item_id = ?')
+      params.push(item_id)
+    }
+    
+    if (task_id) {
+      conditions.push('c.task_id = ?')
+      params.push(task_id)
+    }
+    
+    if (year) {
+      conditions.push('YEAR(c.cost_date) = ?')
+      params.push(year)
+    }
+    
+    if (month) {
+      conditions.push('MONTH(c.cost_date) = ?')
+      params.push(month)
+    }
+    
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ')
+    }
+    
+    query += ' ORDER BY c.cost_date DESC'
+    
+    const [costs] = await pool.query(query, params)
+    res.json(costs)
+  } catch (error) {
+    console.error('Get costs error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Create a new maintenance cost
+app.post('/api/maintenance/costs', async (req, res) => {
+  try {
+    const {
+      item_id,
+      task_id,
+      cost_type,
+      description,
+      amount,
+      vendor,
+      cost_date,
+      notes,
+      tax_amount,
+      warranty_covered
+    } = req.body
+    
+    if (!item_id || !cost_type || !description || !amount || !cost_date) {
+      return res.status(400).json({ error: 'Item ID, cost type, description, amount, and cost date are required' })
+    }
+    
+    const [result] = await pool.query(
+      `INSERT INTO maintenance_costs (
+        item_id, task_id, cost_type, description, amount, vendor, cost_date, notes, tax_amount, warranty_covered
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [item_id, task_id || null, cost_type, description, amount, vendor, cost_date, notes, tax_amount, warranty_covered || false]
+    )
+    
+    const [[newCost]] = await pool.query(
+      'SELECT c.*, i.name as item_name FROM maintenance_costs c LEFT JOIN home_items i ON c.item_id = i.id WHERE c.id = ?',
+      [result.insertId]
+    )
+    res.status(201).json(newCost)
+  } catch (error) {
+    console.error('Create cost error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Get AI insights for maintenance
+app.get('/api/maintenance/ai-insights/:item_id', async (req, res) => {
+  try {
+    const { item_id } = req.params
+    const [insights] = await pool.query(
+      'SELECT * FROM ai_insights WHERE item_id = ? ORDER BY created_at DESC',
+      [item_id]
+    )
+    res.json(insights)
+  } catch (error) {
+    console.error('Get AI insights error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Generate AI maintenance suggestions
+app.post('/api/maintenance/ai-suggestions/:item_id', async (req, res) => {
+  try {
+    const { item_id } = req.params
+    
+    // Get item details
+    const [[item]] = await pool.query('SELECT * FROM home_items WHERE id = ?', [item_id])
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' })
+    }
+    
+    // Get recent tasks and costs for context
+    const [tasks] = await pool.query(
+      'SELECT * FROM maintenance_tasks WHERE item_id = ? ORDER BY created_at DESC LIMIT 10',
+      [item_id]
+    )
+    
+    const [costs] = await pool.query(
+      'SELECT * FROM maintenance_costs WHERE item_id = ? ORDER BY cost_date DESC LIMIT 10',
+      [item_id]
+    )
+    
+    // Calculate age of item
+    const today = new Date()
+    const purchaseDate = item.purchase_date ? new Date(item.purchase_date) : null
+    const installDate = item.installation_date ? new Date(item.installation_date) : null
+    const itemAge = purchaseDate ? Math.floor((today - purchaseDate) / (365.25 * 24 * 60 * 60 * 1000)) : null
+    
+    const messages = [
+      {
+        role: 'system',
+        content: `You are a home maintenance expert AI assistant. Analyze home items and provide maintenance suggestions, cost predictions, and risk assessments. Consider the item's age, category, manufacturer, maintenance history, and cost history.
+
+Provide your response as a JSON array of insights with the following structure:
+[
+  {
+    "insight_type": "Maintenance Suggestion" | "Cost Prediction" | "Risk Assessment" | "Replacement Timing" | "Energy Efficiency" | "Safety Alert",
+    "title": "Brief descriptive title",
+    "description": "Detailed description and recommendations",
+    "confidence_score": 0.0-1.0,
+    "priority": "Low" | "Medium" | "High" | "Critical",
+    "predicted_date": "YYYY-MM-DD" (if applicable),
+    "predicted_cost": number (if applicable)
+  }
+]
+
+Base your suggestions on industry standards, typical maintenance schedules, and the specific item characteristics provided.`
+      },
+      {
+        role: 'user',
+        content: `Analyze this home item and provide maintenance insights:
+
+Item Details:
+- Name: ${item.name}
+- Category: ${item.category}
+- Location: ${item.location}
+- Manufacturer: ${item.manufacturer || 'Unknown'}
+- Model: ${item.model_number || 'Unknown'}
+- Age: ${itemAge ? `${itemAge} years` : 'Unknown'}
+- Estimated Lifespan: ${item.estimated_lifespan_years || 'Unknown'} years
+- Replacement Cost: $${item.replacement_cost || 'Unknown'}
+
+Recent Maintenance Tasks (${tasks.length} total):
+${tasks.map(t => `- ${t.title} (${t.status}) - ${t.task_type} priority ${t.priority}`).join('\n')}
+
+Recent Costs (${costs.length} total):
+${costs.map(c => `- $${c.amount} for ${c.description} (${c.cost_type})`).join('\n')}
+
+Provide 2-5 relevant insights focusing on the most important maintenance recommendations, potential issues, and cost optimization opportunities.`
+      }
+    ]
+    
+    const response = await fetch(`${azureOpenAIConfig.endpoint}openai/deployments/${azureOpenAIConfig.deployment}/chat/completions?api-version=${azureOpenAIConfig.apiVersion}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': azureOpenAIConfig.apiKey
+      },
+      body: JSON.stringify({
+        messages,
+        max_tokens: 2000,
+        temperature: 0.3
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Azure OpenAI API error: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    const aiResponse = data.choices[0].message.content
+    
+    // Parse the JSON response
+    let insights
+    try {
+      const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/) || aiResponse.match(/\[[\s\S]*\]/)
+      const jsonString = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : aiResponse
+      insights = JSON.parse(jsonString)
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', aiResponse)
+      throw new Error('Failed to parse AI insights')
+    }
+    
+    // Save insights to database
+    const savedInsights = []
+    for (const insight of insights) {
+      const [result] = await pool.query(
+        `INSERT INTO ai_insights (
+          item_id, insight_type, title, description, confidence_score, priority, predicted_date, predicted_cost
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          item_id,
+          insight.insight_type,
+          insight.title,
+          insight.description,
+          insight.confidence_score,
+          insight.priority,
+          insight.predicted_date || null,
+          insight.predicted_cost || null
+        ]
+      )
+      
+      const [[savedInsight]] = await pool.query('SELECT * FROM ai_insights WHERE id = ?', [result.insertId])
+      savedInsights.push(savedInsight)
+    }
+    
+    res.json(savedInsights)
+  } catch (error) {
+    console.error('AI suggestions error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Get dashboard statistics
+app.get('/api/maintenance/dashboard', async (req, res) => {
+  try {
+    // Get counts and statistics
+    const [[itemCount]] = await pool.query('SELECT COUNT(*) as count FROM home_items')
+    const [[taskCount]] = await pool.query('SELECT COUNT(*) as count FROM maintenance_tasks WHERE status != "Completed"')
+    const [[overdueCount]] = await pool.query('SELECT COUNT(*) as count FROM maintenance_tasks WHERE due_date < CURDATE() AND status != "Completed"')
+    const [[warrantyCount]] = await pool.query('SELECT COUNT(*) as count FROM warranties WHERE is_active = TRUE AND end_date >= CURDATE()')
+    
+    // Get recent tasks
+    const [recentTasks] = await pool.query(
+      `SELECT t.*, i.name as item_name 
+       FROM maintenance_tasks t 
+       LEFT JOIN home_items i ON t.item_id = i.id 
+       WHERE t.status != 'Completed' 
+       ORDER BY t.due_date ASC 
+       LIMIT 5`
+    )
+    
+    // Get cost summary for current year
+    const [[yearCosts]] = await pool.query(
+      'SELECT COALESCE(SUM(amount), 0) as total FROM maintenance_costs WHERE YEAR(cost_date) = YEAR(CURDATE())'
+    )
+    
+    // Get expiring warranties
+    const [expiringWarranties] = await pool.query(
+      `SELECT w.*, i.name as item_name 
+       FROM warranties w 
+       LEFT JOIN home_items i ON w.item_id = i.id 
+       WHERE w.is_active = TRUE AND w.end_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 90 DAY)
+       ORDER BY w.end_date ASC`
+    )
+    
+    res.json({
+      stats: {
+        total_items: itemCount.count,
+        pending_tasks: taskCount.count,
+        overdue_tasks: overdueCount.count,
+        active_warranties: warrantyCount.count,
+        year_costs: parseFloat(yearCosts.total) || 0
+      },
+      recent_tasks: recentTasks,
+      expiring_warranties: expiringWarranties
+    })
+  } catch (error) {
+    console.error('Dashboard error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// ============================================
 // PLAYLIST CREATOR API ENDPOINTS
 // ============================================
 
@@ -1929,6 +2696,7 @@ app.listen(PORT, () => {
   console.log(`   📄 SharePoint Integration: /api/sharepoint/*`)
   console.log(`   🖼️ Image Management: /api/images/*`)
   console.log(`   🎭 Playlist Creator: /api/playlist-creator/*`)
+  console.log(`   🏠 Home Maintenance: /api/maintenance/*`)
   console.log(``)
   console.log(`🔧 Test endpoints:`)
   console.log(`   📊 Health Check: http://localhost:${PORT}/api/test`)

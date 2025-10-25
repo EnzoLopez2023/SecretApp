@@ -23,12 +23,13 @@ import {
   Logout as LogoutIcon,
   Api as ApiIcon,
   PlaylistAdd as PlaylistAddIcon,
+  HomeRepairService as MaintenanceIcon,
 } from '@mui/icons-material';
 import { useMsal } from '@azure/msal-react';
 
 const drawerWidth = 280;
 
-type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter' | 'plex-api' | 'playlist-creator';
+type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter' | 'plex-api' | 'playlist-creator' | 'home-maintenance';
 
 interface NavigationSidebarProps {
   currentView: AppView;
@@ -51,6 +52,7 @@ export default function NavigationSidebar({ currentView, onNavigate, showOnDashb
     { id: 'dashboard', label: 'Home', icon: <HomeIcon />, color: '#2196F3' },
     { id: 'chat', label: 'AI Assistant', icon: <ChatIcon />, color: '#4CAF50' },
     { id: 'shop', label: 'Shop Tools Manager', icon: <StoreIcon />, color: '#6366f1' },
+    { id: 'home-maintenance', label: 'Home Maintenance', icon: <MaintenanceIcon />, color: '#10b981' },
     { id: 'woodworking', label: 'Project Workshop', icon: <CarpenterIcon />, color: '#f59e0b' },
     { id: 'halloween', label: 'Media Library', icon: <MovieIcon />, color: '#ff9800' },
     { id: 'converter', label: 'Data Converter', icon: <ConverterIcon />, color: '#9c27b0' },
