@@ -557,6 +557,7 @@ app.get('/api/plex/search', async (req, res) => {
             year: movie.year,
             key: movie.key,
             guid: movie.guid,
+            ratingKey: movie.ratingKey,
             section: section.title
           }))
           
@@ -1368,6 +1369,554 @@ app.delete('/api/inventory/images/:imageId', async (req, res) => {
   }
 })
 
+// ============================================
+// PLAYLIST CREATOR API ENDPOINTS
+// ============================================
+
+// Step 1: Search for movie collection using Azure OpenAI
+app.post('/api/playlist-creator/search-collection', async (req, res) => {
+  try {
+    const { query } = req.body
+    
+    if (!query) {
+      return res.status(400).json({ error: 'Query is required' })
+    }
+
+    const messages = [
+      {
+        role: 'system',
+        content: `You are a movie database expert. When asked about a movie collection or series, provide a comprehensive list of movies in JSON format. 
+
+Format your response as a JSON object with a "movies" array. Each movie should have:
+- title: exact movie title
+- year: release year as number
+- director: director name (if known)
+
+Example format:
+{
+  "movies": [
+    {"title": "Movie Title", "year": 2020, "director": "Director Name"},
+    {"title": "Movie Title 2", "year": 2022, "director": "Director Name"}
+  ]
+}
+
+Be comprehensive and include all movies in the series/collection. For franchises, include all main movies, sequels, prequels, and spin-offs that are part of the same universe or story continuity.`
+      },
+      {
+        role: 'user',
+        content: `What are all the movies in the "${query}" collection/series? Please provide a complete list in the specified JSON format.`
+      }
+    ]
+
+    console.log('🔍 Making Azure OpenAI request for:', query)
+    console.log('🔗 Endpoint:', `${azureOpenAIConfig.endpoint}openai/deployments/${azureOpenAIConfig.deployment}/chat/completions?api-version=${azureOpenAIConfig.apiVersion}`)
+    
+    const response = await fetch(`${azureOpenAIConfig.endpoint}openai/deployments/${azureOpenAIConfig.deployment}/chat/completions?api-version=${azureOpenAIConfig.apiVersion}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': azureOpenAIConfig.apiKey
+      },
+      body: JSON.stringify({
+        messages,
+        max_tokens: 2000,
+        temperature: 0.1
+      })
+    })
+
+    console.log('📡 Response status:', response.status)
+    console.log('📡 Response headers:', response.headers)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ Azure OpenAI API error response:', errorText)
+      throw new Error(`Azure OpenAI API error: ${response.status} - ${errorText}`)
+    }
+
+    const responseText = await response.text()
+    console.log('📄 Raw response:', responseText.substring(0, 500) + '...')
+    
+    let data
+    try {
+      data = JSON.parse(responseText)
+    } catch (jsonError) {
+      console.error('❌ Failed to parse JSON response:', responseText)
+      throw new Error('Invalid JSON response from Azure OpenAI')
+    }
+
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.error('❌ Invalid response structure:', data)
+      throw new Error('Invalid response structure from Azure OpenAI')
+    }
+
+    const aiResponse = data.choices[0].message.content
+
+    // Parse the JSON response
+    let movieData
+    try {
+      // Extract JSON from the response (in case there's extra text)
+      const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/) || aiResponse.match(/\{[\s\S]*\}/)
+      const jsonString = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : aiResponse
+      movieData = JSON.parse(jsonString)
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', aiResponse)
+      throw new Error('Failed to parse movie data from AI response')
+    }
+
+    if (!movieData.movies || !Array.isArray(movieData.movies)) {
+      throw new Error('Invalid movie data format from AI')
+    }
+
+    res.json(movieData)
+  } catch (error) {
+    console.error('Movie collection search error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Step 2-4: Process movies with real-time updates via Server-Sent Events
+app.post('/api/playlist-creator/process-movies', async (req, res) => {
+  try {
+    const { movies } = req.body
+    
+    if (!movies || !Array.isArray(movies)) {
+      return res.status(400).json({ error: 'Movies array is required' })
+    }
+
+    // Set up Server-Sent Events
+    res.writeHead(200, {
+      'Content-Type': 'text/plain',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Cache-Control'
+    })
+
+    const sendUpdate = (type, data) => {
+      res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`)
+    }
+
+    const foundMovies = []
+    let processedCount = 0
+
+    sendUpdate('log', { message: `🔍 Starting search for ${movies.length} movies...`, logType: 'info' })
+
+    for (const movie of movies) {
+      processedCount++
+      sendUpdate('log', { message: `[${processedCount}/${movies.length}] Searching for "${movie.title}" (${movie.year})...`, logType: 'info' })
+
+      try {
+        // Direct Plex server search (handles XML properly)
+        const searchUrl = `${plexConfig.baseUrl}/search?query=${encodeURIComponent(movie.title)}&X-Plex-Token=${plexConfig.token}`
+        const searchResponse = await fetch(searchUrl, { 
+          agent: plexAgent,
+          headers: { 'Accept': 'application/xml' }
+        })
+
+        if (!searchResponse.ok) {
+          throw new Error(`Plex search request failed: ${searchResponse.status}`)
+        }
+
+        const xmlText = await searchResponse.text()
+        
+        // Parse XML to extract movie information
+        const allResults = []
+        
+        // Simple XML parsing to extract movie data
+        const videoMatches = xmlText.match(/<Video[^>]*>/g) || []
+        
+        for (const videoMatch of videoMatches) {
+          // Extract attributes from the Video element
+          const titleMatch = videoMatch.match(/title="([^"]*)"/)
+          const yearMatch = videoMatch.match(/year="([^"]*)"/)
+          const ratingKeyMatch = videoMatch.match(/ratingKey="([^"]*)"/)
+          const keyMatch = videoMatch.match(/key="([^"]*)"/)
+          const guidMatch = videoMatch.match(/guid="([^"]*)"/)
+          const sectionMatch = videoMatch.match(/librarySectionTitle="([^"]*)"/)
+          
+          if (titleMatch && yearMatch && ratingKeyMatch) {
+            allResults.push({
+              title: titleMatch[1].replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&'),
+              year: parseInt(yearMatch[1]),
+              ratingKey: ratingKeyMatch[1],
+              key: keyMatch ? keyMatch[1] : '',
+              guid: guidMatch ? guidMatch[1] : '',
+              section: sectionMatch ? sectionMatch[1].replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&') : 'Unknown'
+            })
+          }
+        }
+
+        let foundMovie = null
+
+        // Check if we found any results
+        if (allResults.length > 0) {
+          // Look for exact match in "ALL Movies" section first
+          foundMovie = allResults.find(m => {
+            const titleMatch = m.title.toLowerCase() === movie.title.toLowerCase()
+            const yearMatch = !movie.year || Math.abs(parseInt(m.year) - movie.year) <= 1
+            return titleMatch && yearMatch && m.section === 'ALL Movies'
+          })
+
+          if (!foundMovie) {
+            // If no exact match in "ALL Movies", try any section with matching title and year
+            foundMovie = allResults.find(m => {
+              const titleMatch = m.title.toLowerCase() === movie.title.toLowerCase()
+              const yearMatch = !movie.year || Math.abs(parseInt(m.year) - movie.year) <= 1
+              return titleMatch && yearMatch
+            })
+          }
+        }
+
+        // If still no match, try alternative title formats
+        if (!foundMovie && movie.title.includes(' 2')) {
+          const altTitle = movie.title.replace(' 2', ' II')
+          sendUpdate('log', { message: `   Trying alternative title: "${altTitle}"`, logType: 'warning' })
+          
+          try {
+            const altSearchUrl = `${plexConfig.baseUrl}/search?query=${encodeURIComponent(altTitle)}&X-Plex-Token=${plexConfig.token}`
+            const altSearchResponse = await fetch(altSearchUrl, { 
+              agent: plexAgent,
+              headers: { 'Accept': 'application/xml' }
+            })
+
+            if (altSearchResponse.ok) {
+              const altXmlText = await altSearchResponse.text()
+              const altResults = []
+              
+              const altVideoMatches = altXmlText.match(/<Video[^>]*>/g) || []
+              
+              for (const videoMatch of altVideoMatches) {
+                const titleMatch = videoMatch.match(/title="([^"]*)"/)
+                const yearMatch = videoMatch.match(/year="([^"]*)"/)
+                const ratingKeyMatch = videoMatch.match(/ratingKey="([^"]*)"/)
+                const keyMatch = videoMatch.match(/key="([^"]*)"/)
+                const guidMatch = videoMatch.match(/guid="([^"]*)"/)
+                const sectionMatch = videoMatch.match(/librarySectionTitle="([^"]*)"/)
+                
+                if (titleMatch && yearMatch && ratingKeyMatch) {
+                  altResults.push({
+                    title: titleMatch[1].replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&'),
+                    year: parseInt(yearMatch[1]),
+                    ratingKey: ratingKeyMatch[1],
+                    key: keyMatch ? keyMatch[1] : '',
+                    guid: guidMatch ? guidMatch[1] : '',
+                    section: sectionMatch ? sectionMatch[1].replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&') : 'Unknown'
+                  })
+                }
+              }
+
+              if (altResults.length > 0) {
+                foundMovie = altResults.find(m => {
+                  const titleMatch = m.title.toLowerCase() === altTitle.toLowerCase()
+                  const yearMatch = !movie.year || Math.abs(m.year - movie.year) <= 1
+                  return titleMatch && yearMatch && m.section === 'ALL Movies'
+                })
+
+                if (!foundMovie) {
+                  foundMovie = altResults.find(m => {
+                    const titleMatch = m.title.toLowerCase() === altTitle.toLowerCase()
+                    const yearMatch = !movie.year || Math.abs(m.year - movie.year) <= 1
+                    return titleMatch && yearMatch
+                  })
+                }
+              }
+            }
+          } catch (altError) {
+            console.error(`Error searching alternative title:`, altError)
+          }
+        } else if (!foundMovie && movie.title.includes(' II')) {
+          const altTitle = movie.title.replace(' II', ' 2')
+          sendUpdate('log', { message: `   Trying alternative title: "${altTitle}"`, logType: 'warning' })
+          
+          try {
+            const altSearchUrl2 = `${plexConfig.baseUrl}/search?query=${encodeURIComponent(altTitle)}&X-Plex-Token=${plexConfig.token}`
+            const altSearchResponse2 = await fetch(altSearchUrl2, { 
+              agent: plexAgent,
+              headers: { 'Accept': 'application/xml' }
+            })
+
+            if (altSearchResponse2.ok) {
+              const altXmlText2 = await altSearchResponse2.text()
+              const altResults2 = []
+              
+              const altVideoMatches2 = altXmlText2.match(/<Video[^>]*>/g) || []
+              
+              for (const videoMatch of altVideoMatches2) {
+                const titleMatch = videoMatch.match(/title="([^"]*)"/)
+                const yearMatch = videoMatch.match(/year="([^"]*)"/)
+                const ratingKeyMatch = videoMatch.match(/ratingKey="([^"]*)"/)
+                const keyMatch = videoMatch.match(/key="([^"]*)"/)
+                const guidMatch = videoMatch.match(/guid="([^"]*)"/)
+                const sectionMatch = videoMatch.match(/librarySectionTitle="([^"]*)"/)
+                
+                if (titleMatch && yearMatch && ratingKeyMatch) {
+                  altResults2.push({
+                    title: titleMatch[1].replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&'),
+                    year: parseInt(yearMatch[1]),
+                    ratingKey: ratingKeyMatch[1],
+                    key: keyMatch ? keyMatch[1] : '',
+                    guid: guidMatch ? guidMatch[1] : '',
+                    section: sectionMatch ? sectionMatch[1].replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&') : 'Unknown'
+                  })
+                }
+              }
+
+              if (altResults2.length > 0) {
+                foundMovie = altResults2.find(m => {
+                  const titleMatch = m.title.toLowerCase() === altTitle.toLowerCase()
+                  const yearMatch = !movie.year || Math.abs(m.year - movie.year) <= 1
+                  return titleMatch && yearMatch && m.section === 'ALL Movies'
+                })
+
+                if (!foundMovie) {
+                  foundMovie = altResults2.find(m => {
+                    const titleMatch = m.title.toLowerCase() === altTitle.toLowerCase()
+                    const yearMatch = !movie.year || Math.abs(m.year - movie.year) <= 1
+                    return titleMatch && yearMatch
+                  })
+                }
+              }
+            }
+          } catch (altError2) {
+            console.error(`Error searching second alternative title:`, altError2)
+          }
+        }
+
+        if (foundMovie) {
+          const plexMovie = {
+            title: foundMovie.title,
+            year: foundMovie.year,
+            key: foundMovie.key,
+            guid: foundMovie.guid,
+            ratingKey: foundMovie.ratingKey,
+            section: foundMovie.section || 'Unknown'
+          }
+          
+          foundMovies.push(plexMovie)
+          sendUpdate('movie_found', { movie: plexMovie })
+          sendUpdate('log', { message: `   ✅ Found: "${foundMovie.title}" (${foundMovie.year}) - Rating Key: ${foundMovie.ratingKey}`, logType: 'success' })
+        } else {
+          sendUpdate('log', { message: `   ❌ Not found: "${movie.title}" (${movie.year})`, logType: 'error' })
+        }
+
+        // Small delay to make the process visible
+        await new Promise(resolve => setTimeout(resolve, 500))
+
+      } catch (error) {
+        sendUpdate('log', { message: `   ❌ Error searching for "${movie.title}": ${error.message}`, logType: 'error' })
+      }
+    }
+
+    sendUpdate('complete', { totalFound: foundMovies.length, movies: foundMovies })
+    res.end()
+
+  } catch (error) {
+    console.error('Process movies error:', error)
+    res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`)
+    res.end()
+  }
+})
+
+// Step 5-7: Create playlist with creative title
+app.post('/api/playlist-creator/create-playlist', async (req, res) => {
+  try {
+    const { movies, originalQuery } = req.body
+    
+    if (!movies || !Array.isArray(movies) || movies.length === 0) {
+      return res.status(400).json({ error: 'Movies array is required and cannot be empty' })
+    }
+
+    // Set up Server-Sent Events
+    res.writeHead(200, {
+      'Content-Type': 'text/plain',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Cache-Control'
+    })
+
+    const sendUpdate = (type, data) => {
+      res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`)
+    }
+
+    sendUpdate('log', { message: '🎭 Generating creative playlist title...', logType: 'info' })
+
+    // Generate creative title using Azure OpenAI
+    const titleMessages = [
+      {
+        role: 'system',
+        content: `You are a creative movie playlist title generator. Create short, catchy, and thematic playlist titles based on the movie collection. The title should be:
+- Creative and engaging
+- 2-6 words long
+- Thematically appropriate to the collection
+- Avoid generic words like "Collection" or "Playlist"
+
+Examples:
+- For Mission Impossible: "The IMF Files", "Operation: Unthinkable", "Impossible Protocols"
+- For Star Wars: "A Galaxy Far Away", "The Force Awakens", "Jedi Chronicles"
+- For Marvel: "Heroes Assemble", "Infinity Saga", "Avengers Initiative"
+
+Respond with just the title, no quotes or additional text.`
+      },
+      {
+        role: 'user',
+        content: `Create a creative playlist title for this movie collection: "${originalQuery}". The playlist contains ${movies.length} movies including titles like: ${movies.slice(0, 3).map(m => m.title).join(', ')}`
+      }
+    ]
+
+    let creativeTitle = originalQuery // fallback
+    try {
+      const titleResponse = await fetch(`${azureOpenAIConfig.endpoint}openai/deployments/${azureOpenAIConfig.deployment}/chat/completions?api-version=${azureOpenAIConfig.apiVersion}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': azureOpenAIConfig.apiKey
+        },
+        body: JSON.stringify({
+          messages: titleMessages,
+          max_tokens: 50,
+          temperature: 0.8
+        })
+      })
+
+      if (titleResponse.ok) {
+        const titleData = await titleResponse.json()
+        creativeTitle = titleData.choices[0].message.content.trim().replace(/['"]/g, '')
+        sendUpdate('title_generated', { title: creativeTitle })
+      }
+    } catch (error) {
+      sendUpdate('log', { message: `⚠️ Could not generate creative title, using: "${creativeTitle}"`, logType: 'warning' })
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    // Create the playlist with the first movie
+    sendUpdate('log', { message: `🎬 Creating playlist "${creativeTitle}"...`, logType: 'info' })
+    
+    const machineId = '89a48331c5badd47712cd5d37cc2442998c416c9'
+    const firstMovie = movies[0]
+    
+    const createUrl = `${plexConfig.baseUrl}/playlists?type=video&title=${encodeURIComponent(creativeTitle)}&smart=0&uri=library://${machineId}/item/library/metadata/${firstMovie.ratingKey}&X-Plex-Token=${plexConfig.token}`
+    
+    const createResponse = await fetch(createUrl, { 
+      method: 'POST',
+      agent: plexAgent 
+    })
+    
+    if (!createResponse.ok) {
+      const errorText = await createResponse.text()
+      console.error('Playlist creation error:', errorText)
+      throw new Error(`Failed to create playlist: ${createResponse.status}`)
+    }
+    
+    // Handle XML response for playlist creation
+    const createText = await createResponse.text()
+    console.log('Playlist creation response:', createText)
+    
+    let playlistId
+    // Try to parse as JSON first
+    try {
+      const createData = JSON.parse(createText)
+      playlistId = createData.MediaContainer.Playlist[0].ratingKey
+    } catch (jsonError) {
+      // If JSON parsing fails, parse XML
+      const playlistMatch = createText.match(/ratingKey="(\d+)"/)
+      if (playlistMatch) {
+        playlistId = playlistMatch[1]
+      } else {
+        console.error('Could not extract playlist ID from response:', createText)
+        throw new Error('Failed to extract playlist ID from server response')
+      }
+    }
+    
+    sendUpdate('playlist_created', { playlistId })
+    sendUpdate('log', { message: `✅ Playlist created with ID: ${playlistId}`, logType: 'success' })
+    sendUpdate('log', { message: `📁 Added "${firstMovie.title}" as first movie`, logType: 'info' })
+
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    // Add remaining movies to the playlist
+    console.log(`Adding ${movies.length - 1} remaining movies to playlist ${playlistId}`)
+    for (let i = 1; i < movies.length; i++) {
+      const movie = movies[i]
+      sendUpdate('log', { message: `[${i + 1}/${movies.length}] Adding "${movie.title}"...`, logType: 'info' })
+      
+      try {
+        const uriParam = `library://${machineId}/item/library/metadata/${movie.ratingKey}`
+        const addUrl = `${plexConfig.baseUrl}/playlists/${playlistId}/items?uri=${encodeURIComponent(uriParam)}&X-Plex-Token=${plexConfig.token}`
+        
+        console.log(`Adding movie ${i + 1}: ${movie.title} with ratingKey ${movie.ratingKey}`)
+        console.log(`Add URL: ${addUrl}`)
+        
+        const addResponse = await fetch(addUrl, { 
+          method: 'PUT',
+          headers: { 'Accept': 'application/json' },
+          agent: plexAgent 
+        })
+        
+        const addResponseText = await addResponse.text()
+        console.log(`Add response for ${movie.title}:`, addResponse.status, addResponseText)
+        
+        if (addResponse.ok) {
+          sendUpdate('log', { message: `   ✅ Added "${movie.title}"`, logType: 'success' })
+        } else {
+          sendUpdate('log', { message: `   ❌ Failed to add "${movie.title}" (${addResponse.status})`, logType: 'error' })
+          console.error(`Failed to add ${movie.title}: ${addResponse.status} - ${addResponseText}`)
+        }
+      } catch (error) {
+        console.error(`Error adding ${movie.title}:`, error)
+        sendUpdate('log', { message: `   ❌ Error adding "${movie.title}": ${error.message}`, logType: 'error' })
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 300))
+    }
+
+    // Verify the playlist
+    sendUpdate('log', { message: '🔍 Verifying playlist contents...', logType: 'info' })
+    
+    try {
+      const verifyUrl = `${plexConfig.baseUrl}/playlists/${playlistId}/items?X-Plex-Token=${plexConfig.token}`
+      const verifyResponse = await fetch(verifyUrl, { agent: plexAgent })
+      
+      if (verifyResponse.ok) {
+        const verifyText = await verifyResponse.text()
+        console.log('Playlist verification response:', verifyText)
+        
+        let itemCount = 0
+        
+        // Try to parse as JSON first, fall back to XML parsing
+        try {
+          const verifyData = JSON.parse(verifyText)
+          itemCount = verifyData.MediaContainer?.size || 0
+        } catch (jsonError) {
+          // Parse XML response
+          if (verifyText.includes('<MediaContainer')) {
+            const sizeMatch = verifyText.match(/size="(\d+)"/)
+            itemCount = sizeMatch ? parseInt(sizeMatch[1]) : 0
+          }
+        }
+        
+        sendUpdate('log', { message: `✅ Verification complete: ${itemCount} items in playlist`, logType: 'success' })
+      }
+    } catch (error) {
+      console.error('Playlist verification error:', error)
+      sendUpdate('log', { message: `⚠️ Could not verify playlist: ${error.message}`, logType: 'warning' })
+    }
+
+    sendUpdate('complete', { 
+      playlistId, 
+      title: creativeTitle, 
+      movieCount: movies.length 
+    })
+    res.end()
+
+  } catch (error) {
+    console.error('Create playlist error:', error)
+    res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`)
+    res.end()
+  }
+})
+
 const PORT = 3001
 app.listen(PORT, () => {
   console.log(`🚀 SecretApp Backend Server running on http://localhost:${PORT}`)
@@ -1379,6 +1928,7 @@ app.listen(PORT, () => {
   console.log(`   🛠️ Workshop Inventory: /api/myshop/*`)
   console.log(`   📄 SharePoint Integration: /api/sharepoint/*`)
   console.log(`   🖼️ Image Management: /api/images/*`)
+  console.log(`   🎭 Playlist Creator: /api/playlist-creator/*`)
   console.log(``)
   console.log(`🔧 Test endpoints:`)
   console.log(`   📊 Health Check: http://localhost:${PORT}/api/test`)

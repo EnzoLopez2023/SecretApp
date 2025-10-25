@@ -45,6 +45,7 @@ import MyShopTools from './MyShopTools'               // Woodworking shop manage
 import PlexMovieInsights from './PlexMovieInsights'   // Movie library insights
 import WoodworkingProjects from './WoodworkingProjects'  // Project management
 import PlexAPIClient from './PlexAPIClient'           // Plex API testing client
+import PlaylistCreator from './PlaylistCreator'       // Intelligent playlist creation tool
 
 // Import CSS styles
 import './App.css'
@@ -58,7 +59,7 @@ import './App.css'
  * EXAMPLE: If you try to set currentView to 'chatt' (typo), TypeScript will error
  * before you even run the code!
  */
-type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter' | 'plex-api'
+type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter' | 'plex-api' | 'playlist-creator'
 
 /**
  * Main App Component
@@ -152,6 +153,9 @@ export default function App() {
             )}
             {currentView === 'plex-api' && (
               <PlexAPIClient />
+            )}
+            {currentView === 'playlist-creator' && (
+              <PlaylistCreator />
             )}
           </Box>
         </Box>

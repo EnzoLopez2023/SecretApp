@@ -22,12 +22,13 @@ import {
   AccountCircle as AccountIcon,
   Logout as LogoutIcon,
   Api as ApiIcon,
+  PlaylistAdd as PlaylistAddIcon,
 } from '@mui/icons-material';
 import { useMsal } from '@azure/msal-react';
 
 const drawerWidth = 280;
 
-type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter' | 'plex-api';
+type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter' | 'plex-api' | 'playlist-creator';
 
 interface NavigationSidebarProps {
   currentView: AppView;
@@ -54,6 +55,7 @@ export default function NavigationSidebar({ currentView, onNavigate, showOnDashb
     { id: 'halloween', label: 'Media Library', icon: <MovieIcon />, color: '#ff9800' },
     { id: 'converter', label: 'Data Converter', icon: <ConverterIcon />, color: '#9c27b0' },
     { id: 'plex-api', label: 'Plex API Client', icon: <ApiIcon />, color: '#e74c3c' },
+    { id: 'playlist-creator', label: 'Playlist Creator', icon: <PlaylistAddIcon />, color: '#8b5cf6' },
   ];
 
   // Don't show sidebar on dashboard unless explicitly requested
