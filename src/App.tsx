@@ -31,21 +31,24 @@
  */
 
 // Import React hooks
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 
 // Import Material-UI layout components
-import { Box } from '@mui/material'
+import { Box, CircularProgress, Typography } from '@mui/material'
 
-// Import all the different pages/views of our app
+// Import core components (always loaded)
 import Dashboard from './Dashboard'                    // Homepage with overview
 import NavigationSidebar from './NavigationSidebar'   // Left sidebar menu
-import ChatApp from './ChatApp'                       // AI chat interface
-import ExcelToJsonConverter from './ExcelToJsonConverter'  // Data conversion tool
-import MyShopTools from './MyShopTools'               // Woodworking shop management
-import PlexMovieInsights from './PlexMovieInsights'   // Movie library insights
-import WoodworkingProjects from './WoodworkingProjects'  // Project management
-import PlexAPIClient from './PlexAPIClient'           // Plex API testing client
-import PlaylistCreator from './PlaylistCreator'       // Intelligent playlist creation tool
+
+// Dynamic imports for code splitting (loaded on-demand)
+import { lazy } from 'react'
+const ChatApp = lazy(() => import('./ChatApp'))                       // AI chat interface
+const ExcelToJsonConverter = lazy(() => import('./ExcelToJsonConverter'))  // Data conversion tool
+const MyShopTools = lazy(() => import('./MyShopTools'))               // Woodworking shop management
+const PlexMovieInsights = lazy(() => import('./PlexMovieInsights'))   // Movie library insights
+const WoodworkingProjects = lazy(() => import('./WoodworkingProjects'))  // Project management
+const PlexAPIClient = lazy(() => import('./PlexAPIClient'))           // Plex API testing client
+const PlaylistCreator = lazy(() => import('./PlaylistCreator'))       // Intelligent playlist creation tool
 
 // Import CSS styles
 import './App.css'
@@ -135,28 +138,46 @@ export default function App() {
               
               LEARNING POINT: Each condition checks if currentView matches a specific value
               Only ONE of these will be true at a time, so only ONE component renders
+              
+              CODE SPLITTING: Lazy components are wrapped in Suspense for loading states
             */}
-            {currentView === 'chat' && (
-              <ChatApp />
-            )}
-            {currentView === 'shop' && (
-              <MyShopTools />
-            )}
-            {currentView === 'halloween' && (
-              <PlexMovieInsights />
-            )}
-            {currentView === 'woodworking' && (
-              <WoodworkingProjects />
-            )}
-            {currentView === 'converter' && (
-              <ExcelToJsonConverter />
-            )}
-            {currentView === 'plex-api' && (
-              <PlexAPIClient />
-            )}
-            {currentView === 'playlist-creator' && (
-              <PlaylistCreator />
-            )}
+            <Suspense fallback={
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column',
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                minHeight: '50vh',
+                gap: 2 
+              }}>
+                <CircularProgress size={40} />
+                <Typography variant="body2" color="text.secondary">
+                  Loading component...
+                </Typography>
+              </Box>
+            }>
+              {currentView === 'chat' && (
+                <ChatApp />
+              )}
+              {currentView === 'shop' && (
+                <MyShopTools />
+              )}
+              {currentView === 'halloween' && (
+                <PlexMovieInsights />
+              )}
+              {currentView === 'woodworking' && (
+                <WoodworkingProjects />
+              )}
+              {currentView === 'converter' && (
+                <ExcelToJsonConverter />
+              )}
+              {currentView === 'plex-api' && (
+                <PlexAPIClient />
+              )}
+              {currentView === 'playlist-creator' && (
+                <PlaylistCreator />
+              )}
+            </Suspense>
           </Box>
         </Box>
       )}
