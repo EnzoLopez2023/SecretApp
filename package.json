@@ -6,7 +6,7 @@
     "type":  "module",
     "scripts":  {
                     "dev":  "vite",
-                    "build":  "tsc -b \u0026\u0026 vite build",
+                    "build":  "vite build",
                     "build:full":  "npm run build \u0026\u0026 xcopy /Y server.js dist\\ \u0026\u0026 xcopy /Y web.config dist\\ \u0026\u0026 xcopy /Y package.json dist\\ \u0026\u0026 xcopy /Y ecosystem.config.cjs dist\\",
                     "lint":  "eslint .",
                     "preview":  "vite preview",
