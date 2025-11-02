@@ -50,6 +50,9 @@ const WoodworkingProjects = lazy(() => import('./WoodworkingProjects'))  // Proj
 const PlexAPIClient = lazy(() => import('./PlexAPIClient'))           // Plex API testing client
 const PlaylistCreator = lazy(() => import('./PlaylistCreator'))       // Intelligent playlist creation tool
 const HomeMaintenanceTracker = lazy(() => import('./HomeMaintenanceTracker'))  // Home maintenance tracking system
+const RecipeManager = lazy(() => import('./RecipeManager'))           // Smart recipe management system
+const PantryManagerSimple = lazy(() => import('./PantryManagerSimple'))   // Pantry inventory management system
+const ShoppingListManager = lazy(() => import('./ShoppingListManager'))   // Shopping list management system
 
 // Import CSS styles
 import './App.css'
@@ -63,7 +66,7 @@ import './App.css'
  * EXAMPLE: If you try to set currentView to 'chatt' (typo), TypeScript will error
  * before you even run the code!
  */
-type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter' | 'plex-api' | 'playlist-creator' | 'home-maintenance'
+type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter' | 'plex-api' | 'playlist-creator' | 'home-maintenance' | 'recipe-manager' | 'pantry-manager' | 'shopping-lists'
 
 /**
  * Main App Component
@@ -180,6 +183,15 @@ export default function App() {
               )}
               {currentView === 'home-maintenance' && (
                 <HomeMaintenanceTracker />
+              )}
+              {currentView === 'recipe-manager' && (
+                <RecipeManager />
+              )}
+              {currentView === 'pantry-manager' && (
+                <PantryManagerSimple />
+              )}
+              {currentView === 'shopping-lists' && (
+                <ShoppingListManager />
               )}
             </Suspense>
           </Box>
