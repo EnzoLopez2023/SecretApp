@@ -59,12 +59,12 @@ if ($LASTEXITCODE -ne 0) {
 
 # Verify PM2 backend is running
 Start-Sleep -Seconds 2
-$pm2Status = pm2 list | Select-String "secretapp-backend.*online"
+$pm2Status = pm2 list | Select-String "workshop-studio-backend.*online"
 if ($pm2Status) {
     Write-Host "Backend server is running" -ForegroundColor Green
 } else {
     Write-Host "WARNING: Backend server may not be running properly" -ForegroundColor Yellow
-    Write-Host "Check with: pm2 logs secretapp-backend" -ForegroundColor Yellow
+    Write-Host "Check with: pm2 logs workshop-studio-backend" -ForegroundColor Yellow
 }
 
 # Start IIS service again
