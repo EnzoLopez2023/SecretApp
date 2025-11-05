@@ -109,6 +109,9 @@ export default function RecipeManager() {
     notes: ''
   })
   
+  // State for inline ingredient editing
+  const [editingIngredientIndex, setEditingIngredientIndex] = useState<number | null>(null)
+  
   // State for import functionality
   const [importUrl, setImportUrl] = useState('')
   const [isImporting, setIsImporting] = useState(false)
@@ -368,6 +371,24 @@ export default function RecipeManager() {
   const removeIngredient = (index: number) => {
     const newIngredients = (recipeForm.ingredients || []).filter((_, i) => i !== index)
     setRecipeForm({ ...recipeForm, ingredients: newIngredients })
+    setEditingIngredientIndex(null)
+  }
+
+  const updateIngredient = (index: number, field: keyof Ingredient, value: string | number) => {
+    const newIngredients = [...(recipeForm.ingredients || [])]
+    newIngredients[index] = {
+      ...newIngredients[index],
+      [field]: value
+    }
+    setRecipeForm({ ...recipeForm, ingredients: newIngredients })
+  }
+
+  const startEditingIngredient = (index: number) => {
+    setEditingIngredientIndex(index)
+  }
+
+  const stopEditingIngredient = () => {
+    setEditingIngredientIndex(null)
   }
 
   // Import functionality
@@ -387,16 +408,17 @@ export default function RecipeManager() {
         body: JSON.stringify({ url: importUrl })
       })
 
-      if (!response.ok) throw new Error('Failed to extract recipe from URL')
-
+      // Parse response even if not ok to get detailed error
       const extractedRecipe = await response.json()
 
-      if (extractedRecipe.error) {
+      if (!response.ok || extractedRecipe.error) {
+        const errorMessage = extractedRecipe.error || 'Failed to extract recipe from URL'
+        
         // Check if it's a bot protection error and suggest text import
-        if (extractedRecipe.error.includes('403') || extractedRecipe.error.includes('blocked')) {
-          setError(`${extractedRecipe.error}\n\nTip: Try the "Import from text" button instead! Just copy the recipe from the website and paste it.`)
+        if (errorMessage.includes('403') || errorMessage.includes('blocked') || errorMessage.includes('Forbidden') || errorMessage.includes('bot protection')) {
+          setError(`❌ ${errorMessage}\n\n💡 Tip: Try the "Import from text" button instead!\n\n1. Open the recipe URL in your browser\n2. Copy the recipe text from the page\n3. Click "Import from text" and paste it here`)
         } else {
-          throw new Error(extractedRecipe.error)
+          setError(`Failed to import recipe: ${errorMessage}`)
         }
         setIsImporting(false)
         return
@@ -410,8 +432,8 @@ export default function RecipeManager() {
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error'
       // Add helpful tip for URL import failures
-      if (errorMsg.includes('403') || errorMsg.includes('blocked') || errorMsg.includes('Forbidden')) {
-        setError(`Website blocked the request. Try "Import from text" instead - just copy the recipe from the page and paste it here!`)
+      if (errorMsg.includes('403') || errorMsg.includes('blocked') || errorMsg.includes('Forbidden') || errorMsg.includes('bot protection')) {
+        setError(`❌ Website blocked the request (bot protection detected)\n\n💡 Try "Import from text" instead:\n\n1. Open the recipe in your browser\n2. Copy the recipe text\n3. Use "Import from text" button and paste it here`)
       } else {
         setError(`Failed to import recipe: ${errorMsg}`)
       }
@@ -767,25 +789,78 @@ export default function RecipeManager() {
                       sx={{ 
                         display: 'flex', 
                         alignItems: 'center', 
-                        justifyContent: 'space-between',
+                        gap: 1,
                         p: 1, 
                         border: '1px solid #f0f0f0', 
                         borderRadius: 1, 
                         mb: 1,
-                        backgroundColor: '#fafafa'
+                        backgroundColor: editingIngredientIndex === index ? '#e3f2fd' : '#fafafa'
                       }}
                     >
-                      <Typography variant="body2">
-                        <strong>{decimalToCookingFraction(ingredient.quantity)} {ingredient.unit}</strong> {ingredient.ingredient_name}
-                        {ingredient.notes && ` (${ingredient.notes})`}
-                      </Typography>
-                      <IconButton 
-                        size="small" 
-                        onClick={() => removeIngredient(index)}
-                        color="error"
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
+                      {editingIngredientIndex === index ? (
+                        <>
+                          <TextField
+                            size="small"
+                            type="number"
+                            value={ingredient.quantity}
+                            onChange={(e) => updateIngredient(index, 'quantity', parseFloat(e.target.value) || 0)}
+                            sx={{ width: '80px' }}
+                            inputProps={{ step: 0.25, min: 0 }}
+                          />
+                          <TextField
+                            size="small"
+                            value={ingredient.unit}
+                            onChange={(e) => updateIngredient(index, 'unit', e.target.value)}
+                            sx={{ width: '80px' }}
+                            placeholder="unit"
+                          />
+                          <TextField
+                            size="small"
+                            value={ingredient.ingredient_name}
+                            onChange={(e) => updateIngredient(index, 'ingredient_name', e.target.value)}
+                            sx={{ flex: 1 }}
+                            placeholder="ingredient name"
+                          />
+                          <TextField
+                            size="small"
+                            value={ingredient.notes || ''}
+                            onChange={(e) => updateIngredient(index, 'notes', e.target.value)}
+                            sx={{ flex: 1 }}
+                            placeholder="notes"
+                          />
+                          <IconButton 
+                            size="small" 
+                            onClick={stopEditingIngredient}
+                            color="primary"
+                            title="Done editing"
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </>
+                      ) : (
+                        <>
+                          <Typography variant="body2" sx={{ flex: 1 }}>
+                            <strong>{decimalToCookingFraction(ingredient.quantity)} {ingredient.unit}</strong> {ingredient.ingredient_name}
+                            {ingredient.notes && ` (${ingredient.notes})`}
+                          </Typography>
+                          <IconButton 
+                            size="small" 
+                            onClick={() => startEditingIngredient(index)}
+                            color="primary"
+                            title="Edit ingredient"
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton 
+                            size="small" 
+                            onClick={() => removeIngredient(index)}
+                            color="error"
+                            title="Delete ingredient"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </>
+                      )}
                     </Box>
                   ))}
                 </Box>
@@ -910,9 +985,36 @@ export default function RecipeManager() {
               {selectedRecipe.instructions && (
                 <Box sx={{ mb: 3 }}>
                   <Typography variant="h6" gutterBottom>Instructions</Typography>
-                  <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                    {selectedRecipe.instructions}
-                  </Typography>
+                  <Box>
+                    {selectedRecipe.instructions.split(/(?=\d+\.|Step \d+)/i).filter(step => step.trim()).map((step, index) => {
+                      // Clean up the step text
+                      const cleanedStep = step.trim().replace(/^\d+\.\s*/, '').replace(/^Step \d+:?\s*/i, '')
+                      
+                      if (!cleanedStep) return null
+                      
+                      return (
+                        <Typography 
+                          key={index} 
+                          variant="body1" 
+                          sx={{ mb: 2, display: 'flex', gap: 1 }}
+                        >
+                          <Box 
+                            component="span" 
+                            sx={{ 
+                              fontWeight: 'bold', 
+                              minWidth: '24px',
+                              color: 'primary.main'
+                            }}
+                          >
+                            {index + 1}.
+                          </Box>
+                          <Box component="span" sx={{ flex: 1 }}>
+                            {cleanedStep}
+                          </Box>
+                        </Typography>
+                      )
+                    })}
+                  </Box>
                 </Box>
               )}
 

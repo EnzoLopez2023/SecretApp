@@ -2953,64 +2953,78 @@ app.post('/api/recipes/extract-from-url', async (req, res) => {
     const url_openai = `${azureOpenAIConfig.endpoint}openai/deployments/${azureOpenAIConfig.deployment}/chat/completions?api-version=${azureOpenAIConfig.apiVersion}`
     console.log('Making Azure OpenAI request to:', url_openai)
     
-    const aiResponse = await fetch(url_openai, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': azureOpenAIConfig.apiKey
-      },
-      body: JSON.stringify({
-        messages,
-        max_tokens: 2000,
-        temperature: 0.3
-      }),
-      timeout: 30000 // 30 second timeout
-    })
-    
-    console.log('Azure OpenAI response status:', aiResponse.status)
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text()
-      console.error('Azure OpenAI error response:', errorText)
-      throw new Error(`Azure OpenAI request failed: ${aiResponse.status} - ${errorText}`)
-    }
-    
-    const aiData = await aiResponse.json()
-    let content = aiData.choices[0].message.content.trim()
-    console.log('Azure OpenAI raw response:', content)
-    
-    // Clean up markdown code blocks if present
-    if (content.startsWith('```json')) {
-      content = content.replace(/^```json\s*/, '').replace(/\s*```$/, '')
-    } else if (content.startsWith('```')) {
-      content = content.replace(/^```\s*/, '').replace(/\s*```$/, '')
-    }
-    console.log('Cleaned content for parsing:', content)
+    // Create AbortController for timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
     
     try {
-      // Try to find JSON within the response if it's wrapped in other text
-      let jsonContent = content
-      const jsonMatch = content.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        jsonContent = jsonMatch[0]
-      }
-      
-      const extractedRecipe = JSON.parse(jsonContent)
-      
-      if (extractedRecipe.error) {
-        return res.status(400).json({ error: extractedRecipe.error })
-      }
-      
-      res.json(extractedRecipe)
-    } catch (parseError) {
-      console.error('Failed to parse AI response:', content)
-      console.error('Parse error:', parseError.message)
-      
-      // Return a more helpful error with the raw response for debugging
-      res.status(500).json({ 
-        error: 'Failed to extract recipe data - AI response was not valid JSON', 
-        raw_response: content.substring(0, 1000),
-        parse_error: parseError.message
+      const aiResponse = await fetch(url_openai, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': azureOpenAIConfig.apiKey
+        },
+        body: JSON.stringify({
+          messages,
+          max_tokens: 2000,
+          temperature: 0.3
+        }),
+        signal: controller.signal
       })
+      
+      clearTimeout(timeoutId)
+      
+      console.log('Azure OpenAI response status:', aiResponse.status)
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text()
+        console.error('Azure OpenAI error response:', errorText)
+        throw new Error(`Azure OpenAI request failed: ${aiResponse.status} - ${errorText}`)
+      }
+      
+      const aiData = await aiResponse.json()
+      let content = aiData.choices[0].message.content.trim()
+      console.log('Azure OpenAI raw response:', content)
+      
+      // Clean up markdown code blocks if present
+      if (content.startsWith('```json')) {
+        content = content.replace(/^```json\s*/, '').replace(/\s*```$/, '')
+      } else if (content.startsWith('```')) {
+        content = content.replace(/^```\s*/, '').replace(/\s*```$/, '')
+      }
+      console.log('Cleaned content for parsing:', content)
+      
+      try {
+        // Try to find JSON within the response if it's wrapped in other text
+        let jsonContent = content
+        const jsonMatch = content.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          jsonContent = jsonMatch[0]
+        }
+        
+        const extractedRecipe = JSON.parse(jsonContent)
+        
+        if (extractedRecipe.error) {
+          return res.status(400).json({ error: extractedRecipe.error })
+        }
+        
+        res.json(extractedRecipe)
+      } catch (parseError) {
+        console.error('Failed to parse AI response:', content)
+        console.error('Parse error:', parseError.message)
+        
+        // Return a more helpful error with the raw response for debugging
+        res.status(500).json({ 
+          error: 'Failed to extract recipe data - AI response was not valid JSON', 
+          raw_response: content.substring(0, 1000),
+          parse_error: parseError.message
+        })
+      }
+    } catch (fetchError) {
+      clearTimeout(timeoutId)
+      if (fetchError.name === 'AbortError') {
+        throw new Error('Request to Azure OpenAI timed out after 60 seconds')
+      }
+      throw fetchError
     }
     
   } catch (error) {
