@@ -2866,6 +2866,22 @@ app.post('/api/recipes/extract-from-url', async (req, res) => {
       console.log('Found', jsonLdMatches.length, 'JSON-LD script(s)')
       structuredData = '\n\nSTRUCTURED DATA FOUND:\n' + jsonLdMatches.join('\n')
     }
+
+    // Focus on the readable page content the model needs (strip head scripts/styles/etc.)
+    const bodyMatch = html.match(/<body[\s\S]*?>([\s\S]*?)<\/body>/i)
+    const bodyContent = bodyMatch ? bodyMatch[1] : html
+    const cleanedHtml = bodyContent
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/<br\s*\/?>(?=\s*<)/gi, '<br> ')
+    const normalizedHtml = cleanedHtml
+      .replace(/<br\s*\/?/gi, '\n')
+      .replace(/<\/(p|div|li|h[1-6])>/gi, '</$1>\n')
+    const truncatedHtml = normalizedHtml.substring(0, 60000)
+    console.log('Normalized HTML length:', normalizedHtml.length)
+    console.log('Truncated HTML length:', truncatedHtml.length)
     
     // Use Azure OpenAI to extract recipe from HTML
     const messages = [
@@ -2901,7 +2917,7 @@ app.post('/api/recipes/extract-from-url', async (req, res) => {
         5. Look for recipe metadata (prep time, cook time, servings)
         6. Check for recipe titles in h1, h2, or recipe-specific headings
         
-        IMPORTANT: Many recipe websites use structured data or specific HTML patterns. Be thorough in your search. This recipe definitely exists on this page - look for "Mini Pecan Pies" content, pecan ingredients, pie crust, baking instructions, etc. Return ONLY the JSON object, no additional text. Only return {"error": "No recipe found"} if you absolutely cannot find any recipe content after exhaustive searching.`
+  IMPORTANT: Many recipe websites use structured data or specific HTML patterns. Be thorough in your search regardless of cuisine or dessert type. Focus only on the ingredients, instructions, and metadata that actually appear in the supplied HTML. Do not infer or substitute content from other recipes. Return ONLY the JSON object, no additional text. Only return {"error": "No recipe found"} if you absolutely cannot find any recipe content after exhaustive searching.`
       },
       {
         role: 'user',
@@ -2913,8 +2929,8 @@ app.post('/api/recipes/extract-from-url', async (req, res) => {
         
         ${structuredData}
         
-        HTML content (first 20000 characters):
-        ${html.substring(0, 20000)}`
+        HTML content (cleaned and truncated to 60000 characters):
+        ${truncatedHtml}`
       }
     ]
     
@@ -2985,6 +3001,164 @@ app.post('/api/recipes/extract-from-url', async (req, res) => {
     console.error('Recipe extraction error:', error)
     console.error('Error stack:', error.stack)
     res.status(500).json({ error: error.message, details: error.stack })
+  }
+})
+
+// Extract recipe from raw text using AI
+app.post('/api/recipes/extract-from-text', async (req, res) => {
+  try {
+    console.log('Received request at /api/recipes/extract-from-text');
+    const { recipe_text: recipeText } = req.body
+
+    if (!recipeText || typeof recipeText !== 'string' || !recipeText.trim()) {
+      return res.status(400).json({ error: 'Recipe text is required' })
+    }
+
+    console.log('Attempting to extract recipe from text input, length:', recipeText.length)
+
+    const messages = [
+      {
+        role: 'system',
+        content: `You are a recipe parsing expert. Convert free-form recipe notes into a structured JSON object with this exact schema:
+{
+  "title": "recipe title",
+  "description": "brief description",
+  "cuisine_type": "cuisine type if available",
+  "meal_type": "breakfast/lunch/dinner/snack/dessert/appetizer",
+  "prep_time_minutes": number or 0,
+  "cook_time_minutes": number or 0,
+  "servings": number or 4,
+  "difficulty_level": "easy/medium/hard",
+  "instructions": "step by step instructions as a single string with numbered steps",
+  "ingredients": [
+    {
+      "ingredient_name": "name of ingredient",
+      "quantity": number or 0,
+      "unit": "unit (e.g., cups, tbsp, g, ml, pinch)",
+      "notes": "optional notes"
+    }
+  ],
+  "tags": "comma-separated tags"
+}
+
+Always respond with ONLY the JSON object. Do not invent ingredients or steps that are not in the text. If quantities are given as fractions, convert them to decimal numbers with up to two decimal places.`
+      },
+      {
+        role: 'user',
+        content: `Parse this recipe text into the JSON structure described:
+
+${recipeText.trim()}`
+      }
+    ]
+
+    const url = `${azureOpenAIConfig.endpoint}openai/deployments/${azureOpenAIConfig.deployment}/chat/completions?api-version=${azureOpenAIConfig.apiVersion}`
+    console.log('Making Azure OpenAI request for text import to:', url)
+
+    const aiResponse = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': azureOpenAIConfig.apiKey
+      },
+      body: JSON.stringify({
+        messages,
+        max_tokens: 2000,
+        temperature: 0.2
+      }),
+      timeout: 30000
+    })
+
+    console.log('Azure OpenAI response status (text import):', aiResponse.status)
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text()
+      console.error('Azure OpenAI error response (text import):', errorText)
+      throw new Error(`Azure OpenAI request failed: ${aiResponse.status} - ${errorText}`)
+    }
+
+    const aiData = await aiResponse.json()
+    let content = aiData.choices?.[0]?.message?.content?.trim() || ''
+    console.log('Azure OpenAI raw response (text import):', content)
+
+    if (!content) {
+      throw new Error('Empty response from AI when parsing recipe text')
+    }
+
+    if (content.startsWith('```json')) {
+      content = content.replace(/^```json\s*/, '').replace(/\s*```$/, '')
+    } else if (content.startsWith('```')) {
+      content = content.replace(/^```\s*/, '').replace(/\s*```$/, '')
+    }
+
+    const parseQuantity = (value) => {
+      if (typeof value === 'number' && !Number.isNaN(value)) return value
+      if (typeof value !== 'string') return 0
+      const trimmed = value.trim()
+      if (!trimmed) return 0
+
+      const mixedMatch = trimmed.match(/^(\d+)\s+(\d+)\/(\d+)$/)
+      if (mixedMatch) {
+        const whole = parseInt(mixedMatch[1])
+        const numerator = parseInt(mixedMatch[2])
+        const denominator = parseInt(mixedMatch[3]) || 1
+        return whole + numerator / denominator
+      }
+
+      const fractionMatch = trimmed.match(/^(\d+)\/(\d+)$/)
+      if (fractionMatch) {
+        const numerator = parseInt(fractionMatch[1])
+        const denominator = parseInt(fractionMatch[2]) || 1
+        return numerator / denominator
+      }
+
+      const normalized = trimmed.replace(/[^0-9.\-]/g, '')
+      const parsed = parseFloat(normalized)
+      return Number.isNaN(parsed) ? 0 : parsed
+    }
+
+    try {
+      const extracted = JSON.parse(content)
+
+      const normalizedInstructions = Array.isArray(extracted.instructions)
+        ? extracted.instructions.join('\n')
+        : (extracted.instructions || '')
+
+      const normalizedIngredients = Array.isArray(extracted.ingredients)
+        ? extracted.ingredients
+            .map(ingredient => ({
+              ingredient_name: ingredient.ingredient_name || ingredient.name || ingredient.item || '',
+              quantity: parseQuantity(ingredient.quantity),
+              unit: ingredient.unit || ingredient.measure || '',
+              notes: ingredient.notes || ''
+            }))
+            .filter(ingredient => ingredient.ingredient_name)
+        : []
+
+      const normalizedRecipe = {
+        title: extracted.title || 'Untitled Recipe',
+        description: extracted.description || '',
+        cuisine_type: extracted.cuisine_type || '',
+        meal_type: extracted.meal_type || 'dinner',
+        prep_time_minutes: typeof extracted.prep_time_minutes === 'number' ? extracted.prep_time_minutes : 0,
+        cook_time_minutes: typeof extracted.cook_time_minutes === 'number' ? extracted.cook_time_minutes : 0,
+        servings: typeof extracted.servings === 'number' ? extracted.servings : 4,
+        difficulty_level: extracted.difficulty_level || 'medium',
+        instructions: normalizedInstructions,
+        tags: extracted.tags || '',
+        ingredients: normalizedIngredients
+      }
+
+      res.json(normalizedRecipe)
+    } catch (parseError) {
+      console.error('Failed to parse AI response for text import:', content)
+      console.error('Parse error:', parseError)
+      res.status(500).json({
+        error: 'Failed to parse recipe from text input',
+        raw_response: content.substring(0, 1000)
+      })
+    }
+  } catch (error) {
+    console.error('Recipe text extraction error:', error)
+    res.status(500).json({ error: error.message })
   }
 })
 
@@ -3633,7 +3807,7 @@ Respond with just the title, no quotes or additional text.`
   }
 })
 
-const PORT = 3001
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001
 app.listen(PORT, () => {
   console.log(`🚀 SecretApp Backend Server running on http://localhost:${PORT}`)
   console.log(``)

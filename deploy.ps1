@@ -25,6 +25,7 @@ Stop-Service -Name W3SVC -Force
 # Deploy dist contents to IIS site folder
 Write-Host "Copying build artifacts to IIS site" -ForegroundColor Yellow
 xcopy /E /Y "C:\Source\Repo\SecretApp\dist\*" "C:\inetpub\wwwroot\secretapp\" | Out-Null
+xcopy /E /Y "C:\Source\Repo\SecretApp\utils" "C:\inetpub\wwwroot\secretapp\utils\" | Out-Null
 
 # Copy version.json to site for runtime access
 Write-Host "Copying version info..." -ForegroundColor Yellow

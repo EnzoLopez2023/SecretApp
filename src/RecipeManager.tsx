@@ -112,6 +112,76 @@ export default function RecipeManager() {
   // State for import functionality
   const [importUrl, setImportUrl] = useState('')
   const [isImporting, setIsImporting] = useState(false)
+  const [isTextImportDialogOpen, setIsTextImportDialogOpen] = useState(false)
+  const [importText, setImportText] = useState('')
+  const [isImportingText, setIsImportingText] = useState(false)
+
+  const parseQuantity = (value: unknown): number => {
+    if (typeof value === 'number' && !Number.isNaN(value)) return value
+    if (typeof value !== 'string') return 0
+    const trimmed = value.trim()
+    if (!trimmed) return 0
+
+    const mixedMatch = trimmed.match(/^(\d+)\s+(\d+)\/(\d+)$/)
+    if (mixedMatch) {
+      const whole = parseInt(mixedMatch[1])
+      const numerator = parseInt(mixedMatch[2])
+      const denominator = parseInt(mixedMatch[3]) || 1
+      return whole + numerator / denominator
+    }
+
+    const fractionMatch = trimmed.match(/^(\d+)\/(\d+)$/)
+    if (fractionMatch) {
+      const numerator = parseInt(fractionMatch[1])
+      const denominator = parseInt(fractionMatch[2]) || 1
+      return numerator / denominator
+    }
+
+    const normalized = trimmed.replace(/[^0-9.\-]/g, '')
+    const parsed = parseFloat(normalized)
+    return Number.isNaN(parsed) ? 0 : parsed
+  }
+
+  const handleExtractedRecipe = (extractedRecipe: any, successMessage: string) => {
+    if (!extractedRecipe) {
+      throw new Error('No recipe data returned')
+    }
+
+    const instructions = Array.isArray(extractedRecipe.instructions)
+      ? extractedRecipe.instructions.join('\n')
+      : (extractedRecipe.instructions || '')
+
+    const normalizedIngredients: Ingredient[] = Array.isArray(extractedRecipe.ingredients)
+      ? extractedRecipe.ingredients
+          .map((ingredient: any) => ({
+            ingredient_name: ingredient?.ingredient_name || ingredient?.name || ingredient?.item || '',
+            quantity: parseQuantity(ingredient?.quantity),
+            unit: ingredient?.unit || ingredient?.measure || '',
+            notes: ingredient?.notes || ''
+          }))
+          .filter((ingredient: Ingredient) => ingredient.ingredient_name.trim().length > 0)
+      : []
+
+    setRecipeForm({
+      title: extractedRecipe.title || '',
+      description: extractedRecipe.description || '',
+      cuisine_type: extractedRecipe.cuisine_type || '',
+      meal_type: extractedRecipe.meal_type || 'dinner',
+      prep_time_minutes: typeof extractedRecipe.prep_time_minutes === 'number' ? extractedRecipe.prep_time_minutes : 0,
+      cook_time_minutes: typeof extractedRecipe.cook_time_minutes === 'number' ? extractedRecipe.cook_time_minutes : 0,
+      servings: typeof extractedRecipe.servings === 'number' ? extractedRecipe.servings : 4,
+      difficulty_level: extractedRecipe.difficulty_level || 'medium',
+      instructions,
+      tags: extractedRecipe.tags || '',
+      is_favorite: false,
+      rating: 0,
+      ingredients: normalizedIngredients
+    })
+
+    setIsEditMode(false)
+    setIsRecipeDialogOpen(true)
+    setSuccess(successMessage)
+  }
   
   // Load data on component mount
   useEffect(() => {
@@ -320,34 +390,16 @@ export default function RecipeManager() {
       if (!response.ok) throw new Error('Failed to extract recipe from URL')
 
       const extractedRecipe = await response.json()
+
+      if (extractedRecipe.error) {
+        throw new Error(extractedRecipe.error)
+      }
       
       // Close import dialog and open recipe dialog with extracted data
       setIsImportDialogOpen(false)
       setImportUrl('')
-      
-      // Set the form with extracted data
-      setRecipeForm({
-        ...extractedRecipe,
-        // Ensure all fields have non-null values
-        title: extractedRecipe.title || '',
-        description: extractedRecipe.description || '',
-        cuisine_type: extractedRecipe.cuisine_type || '',
-        meal_type: extractedRecipe.meal_type || 'dinner',
-        prep_time_minutes: extractedRecipe.prep_time_minutes || 0,
-        cook_time_minutes: extractedRecipe.cook_time_minutes || 0,
-        servings: extractedRecipe.servings || 4,
-        difficulty_level: extractedRecipe.difficulty_level || 'medium',
-        instructions: extractedRecipe.instructions || '',
-        tags: extractedRecipe.tags || '',
-        is_favorite: false,
-        rating: 0,
-        ingredients: extractedRecipe.ingredients || []
-      })
-      
-      setIsEditMode(false)
-      setIsRecipeDialogOpen(true)
-      setSuccess('Recipe extracted successfully! Review and save.')
-      
+
+      handleExtractedRecipe(extractedRecipe, 'Recipe extracted successfully! Review and save.')
     } catch (err) {
       setError(`Failed to import recipe: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
@@ -359,6 +411,46 @@ export default function RecipeManager() {
     setIsImportDialogOpen(false)
     setImportUrl('')
     setIsImporting(false)
+  }
+
+  const importRecipeFromText = async () => {
+    if (!importText.trim()) {
+      setError('Please paste the recipe text')
+      return
+    }
+
+    try {
+      setIsImportingText(true)
+
+      const response = await fetch('/api/recipes/extract-from-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipe_text: importText })
+      })
+
+      if (!response.ok) throw new Error('Failed to analyze recipe text')
+
+      const extractedRecipe = await response.json()
+
+      if (extractedRecipe.error) {
+        throw new Error(extractedRecipe.error)
+      }
+
+      setIsTextImportDialogOpen(false)
+      setImportText('')
+
+      handleExtractedRecipe(extractedRecipe, 'Recipe parsed successfully! Review and save.')
+    } catch (err) {
+      setError(`Failed to import recipe text: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setIsImportingText(false)
+    }
+  }
+
+  const closeTextImportDialog = () => {
+    setIsTextImportDialogOpen(false)
+    setImportText('')
+    setIsImportingText(false)
   }
   
   // Filter recipes based on search
@@ -386,21 +478,38 @@ export default function RecipeManager() {
             variant="outlined"
           />
         </Box>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => setIsImportDialogOpen(true)}
-          sx={{
-            backgroundColor: '#d32f2f',
-            color: 'white',
-            fontWeight: 'bold',
-            '&:hover': {
-              backgroundColor: '#b71c1c'
-            }
-          }}
-        >
-          Import from website
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => setIsTextImportDialogOpen(true)}
+            sx={{
+              backgroundColor: '#1976d2',
+              color: 'white',
+              fontWeight: 'bold',
+              '&:hover': {
+                backgroundColor: '#115293'
+              }
+            }}
+          >
+            Import from text
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => setIsImportDialogOpen(true)}
+            sx={{
+              backgroundColor: '#d32f2f',
+              color: 'white',
+              fontWeight: 'bold',
+              '&:hover': {
+                backgroundColor: '#b71c1c'
+              }
+            }}
+          >
+            Import from website
+          </Button>
+        </Box>
       </Box>
       
       {/* Search */}
@@ -812,6 +921,46 @@ export default function RecipeManager() {
           <Button onClick={closeViewDialog}>Close</Button>
         </DialogActions>
       </Dialog>
+
+        {/* Import Recipe From Text Dialog */}
+        <Dialog
+          open={isTextImportDialogOpen}
+          onClose={closeTextImportDialog}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Import Recipe from Text</DialogTitle>
+          <DialogContent>
+            <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Alert severity="info">
+                Paste any recipe text. AI will parse the ingredients and instructions into your recipe form.
+              </Alert>
+              <TextField
+                fullWidth
+                label="Recipe text"
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                placeholder={
+                  'Chewy Granola Bars\nIngredients...\n\nInstructions...'
+                }
+                multiline
+                minRows={10}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeTextImportDialog} disabled={isImportingText}>
+              Cancel
+            </Button>
+            <Button
+              onClick={importRecipeFromText}
+              variant="contained"
+              disabled={isImportingText || !importText.trim()}
+            >
+              {isImportingText ? <CircularProgress size={20} /> : 'Parse Recipe'}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
       {/* Import Recipe Dialog */}
       <Dialog
