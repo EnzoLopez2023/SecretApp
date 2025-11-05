@@ -392,7 +392,14 @@ export default function RecipeManager() {
       const extractedRecipe = await response.json()
 
       if (extractedRecipe.error) {
-        throw new Error(extractedRecipe.error)
+        // Check if it's a bot protection error and suggest text import
+        if (extractedRecipe.error.includes('403') || extractedRecipe.error.includes('blocked')) {
+          setError(`${extractedRecipe.error}\n\nTip: Try the "Import from text" button instead! Just copy the recipe from the website and paste it.`)
+        } else {
+          throw new Error(extractedRecipe.error)
+        }
+        setIsImporting(false)
+        return
       }
       
       // Close import dialog and open recipe dialog with extracted data
@@ -401,7 +408,13 @@ export default function RecipeManager() {
 
       handleExtractedRecipe(extractedRecipe, 'Recipe extracted successfully! Review and save.')
     } catch (err) {
-      setError(`Failed to import recipe: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+      // Add helpful tip for URL import failures
+      if (errorMsg.includes('403') || errorMsg.includes('blocked') || errorMsg.includes('Forbidden')) {
+        setError(`Website blocked the request. Try "Import from text" instead - just copy the recipe from the page and paste it here!`)
+      } else {
+        setError(`Failed to import recipe: ${errorMsg}`)
+      }
     } finally {
       setIsImporting(false)
     }
