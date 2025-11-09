@@ -2244,6 +2244,9 @@ app.post('/api/recipes', async (req, res) => {
       ? JSON.stringify(images) 
       : (image_url ? JSON.stringify([image_url]) : null)
     
+    // Handle tags: if it's already a string, use it; if array, stringify it
+    const tagsJson = tags ? (typeof tags === 'string' ? tags : JSON.stringify(tags)) : null
+    
     // Insert recipe
     const [result] = await pool.query(
       `INSERT INTO recipes (
@@ -2253,7 +2256,7 @@ app.post('/api/recipes', async (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [title, description, cuisine_type, meal_type, prep_time_minutes,
        cook_time_minutes, servings, difficulty_level, instructions, notes,
-       source_url, image_url, imagesJson, JSON.stringify(tags)]
+       source_url, image_url, imagesJson, tagsJson]
     )
     
     const recipeId = result.insertId
@@ -2296,6 +2299,9 @@ app.put('/api/recipes/:id', async (req, res) => {
       ? JSON.stringify(images) 
       : (image_url ? JSON.stringify([image_url]) : null)
     
+    // Handle tags: if it's already a string, use it; if array, stringify it
+    const tagsJson = tags ? (typeof tags === 'string' ? tags : JSON.stringify(tags)) : null
+    
     // Update recipe
     await pool.query(
       `UPDATE recipes SET
@@ -2306,7 +2312,7 @@ app.put('/api/recipes/:id', async (req, res) => {
       WHERE id = ?`,
       [title, description, cuisine_type, meal_type, prep_time_minutes,
        cook_time_minutes, servings, difficulty_level, instructions, notes,
-       source_url, image_url, imagesJson, JSON.stringify(tags), is_favorite, rating, id]
+       source_url, image_url, imagesJson, tagsJson, is_favorite, rating, id]
     )
     
     // Update ingredients if provided
