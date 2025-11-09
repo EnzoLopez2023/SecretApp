@@ -1,18 +1,47 @@
 # SecretApp - Comprehensive Workshop & Media Management System
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/EnzoLopez2023/SecretApp)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/EnzoLopez2023/SecretApp/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-4.9+-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18+-61DAFB.svg)](https://reactjs.org/)
 [![Material-UI](https://img.shields.io/badge/Material--UI-5+-0081CB.svg)](https://mui.com/)
 [![Educational](https://img.shields.io/badge/Educational-Ready-yellow.svg)](#educational-features)
+[![Last Updated](https://img.shields.io/badge/Updated-November%202025-green.svg)](https://github.com/EnzoLopez2023/SecretApp)
 
 > A feature-rich, educational workshop and media management application built with React, TypeScript, and Azure OpenAI. Designed as both a functional application and a comprehensive learning resource for students and developers.
+
+**Latest Release:** v1.3.0 (November 2025) - Recipe Manager with AI Import & Image Upload
 
 ## 🌟 Overview
 
 SecretApp is a modern, full-stack web application that combines intelligent AI assistance with practical workshop management tools. It serves as both a powerful productivity suite and an educational codebase for learning modern web development practices.
 
-## 🎯 Key Features
+## � Recent Updates (November 2025)
+
+### Recipe Manager - Complete Feature Set
+- ✅ **AI-Powered Recipe Import**: Extract recipes from plain text using Azure OpenAI GPT-5
+- ✅ **Image Upload System**: Upload recipe images directly (BLOB storage) or add by URL
+- ✅ **Multiple Images**: Support for unlimited images per recipe with smart display
+- ✅ **Recipe Notes**: Special tips, substitutions, and variations field
+- ✅ **Smart Ingredient Parsing**: Automatic fraction conversion and format normalization
+- ✅ **Advanced Search**: Filter by cuisine, meal type, difficulty, ingredients, favorites
+- ✅ **Inline Editing**: Edit ingredients directly in the list without modal forms
+
+### Woodworking Projects - UI/UX Improvements
+- ✅ **Date Validation**: Fixed date field reset bug when editing projects
+- ✅ **Error Messages**: Clear, actionable error messages for validation issues
+- ✅ **Responsive Gallery**: Grid-based image layout (2/3/4 columns)
+- ✅ **Form Optimization**: Reduced textarea sizes for better screen space usage
+- ✅ **Image Display**: Square aspect ratio with click-to-enlarge functionality
+
+### Technical Improvements
+- ✅ **Database Migrations**: New recipe_images table with BLOB storage
+- ✅ **API Endpoints**: POST/GET/DELETE for recipe image management
+- ✅ **File Upload**: Base64 conversion with preview thumbnails
+- ✅ **Date Handling**: Comprehensive validation with regex and date object checks
+- ✅ **JSON Parsing**: Proper handling of JSON arrays in database responses
+
+## �🎯 Key Features
 
 ### 🤖 AI-Powered Chat Assistant
 - **Azure OpenAI GPT-5 Integration**: Advanced AI conversations with context awareness
@@ -41,6 +70,18 @@ SecretApp is a modern, full-stack web application that combines intelligent AI a
 - **PDF Viewer**: Built-in PDF viewing for project plans
 - **Progress Tracking**: Status management and timeline tracking
 - **Material Lists**: Track wood types, hardware, and supplies
+- **Responsive Image Gallery**: Grid-based image display (2/3/4 columns based on screen size)
+- **Advanced Date Validation**: Smart date handling with clear error messages
+
+### 🍳 Recipe Manager (NEW)
+- **AI-Powered Recipe Import**: Extract recipes from text with Azure OpenAI
+- **Smart Ingredient Parsing**: Convert fractions, handle mixed formats automatically
+- **Multiple Image Support**: Upload images directly or add by URL
+- **Recipe Notes**: Special tips, substitutions, and variations
+- **Advanced Search**: Filter by cuisine, meal type, difficulty, ingredients
+- **Favorites & Ratings**: Mark favorites and rate your recipes
+- **Image Display**: First image on cards, full gallery in detail view
+- **File Upload Integration**: Same seamless upload experience as Woodworking Projects
 
 ### 🔐 Enterprise Authentication
 - **Azure Active Directory**: Secure enterprise-grade authentication
@@ -65,23 +106,37 @@ SecretApp is a modern, full-stack web application that combines intelligent AI a
 ## 🏗️ Technical Architecture
 
 ### Frontend Stack
-- **React 18**: Latest React with concurrent features
-- **TypeScript**: Full type safety and developer experience
-- **Material-UI v5**: Modern component library
-- **Vite**: Fast build tool and development server
+- **React 18**: Latest React with concurrent features and Suspense
+- **TypeScript 4.9+**: Full type safety and enhanced developer experience
+- **Material-UI v5**: Modern Material Design 3 component library
+- **Vite 7**: Lightning-fast build tool and HMR development server
 - **PDF.js**: In-browser PDF viewing capabilities
+- **Lucide React**: Modern icon library
+- **React Markdown**: Markdown rendering with syntax highlighting
 
-### Backend Integration
-- **Node.js/Express**: RESTful API server
-- **MySQL Database**: Persistent data storage
-- **Azure OpenAI**: GPT-5 chat completions
-- **Plex API**: Media server integration
-- **File Upload**: Multipart form handling
+### Backend Stack
+- **Node.js 18+**: JavaScript runtime
+- **Express 4**: Fast, minimalist web framework
+- **MySQL 8**: Relational database with JSON support
+- **MySQL2**: Promise-based MySQL client with connection pooling
+- **Multer**: Multipart form data handling for file uploads
+- **CORS**: Cross-origin resource sharing middleware
 
-### Cloud Services
-- **Azure Active Directory**: Authentication and user management
-- **Azure OpenAI Service**: AI language model hosting
-- **Cloud Storage**: File and image storage
+### AI & External Services
+- **Azure OpenAI**: GPT-5 chat completions API
+- **Plex Media Server**: Media library integration
+- **OMDb API**: Movie metadata enrichment (optional)
+
+### Cloud & Deployment
+- **Azure Active Directory**: Optional enterprise authentication
+- **IIS**: Windows Server hosting (or any Node.js host)
+- **PM2**: Process management for production (via ecosystem.config.cjs)
+
+### Development Tools
+- **ESLint**: Code linting and style enforcement
+- **TypeScript Compiler**: Type checking and compilation
+- **PowerShell**: Deployment automation scripts
+- **Git**: Version control with automated versioning
 
 ## 📚 Educational Features
 
@@ -148,9 +203,12 @@ src/
 ├── 📄 App.tsx               # Routing & layout management
 ├── 📄 Dashboard.tsx         # Homepage & navigation patterns
 ├── 📄 ChatApp.tsx           # Chat interface & AI integration
+├── 📄 RecipeManager.tsx     # Recipe management with AI parsing ⭐ NEW
 ├── 📄 MyShopTools.tsx       # Inventory CRUD operations
 ├── 📄 PlexMovieInsights.tsx # Media discovery & analytics
+├── 📄 PlexApiClient.tsx     # API testing interface for Plex
 ├── 📄 WoodworkingProjects.tsx # Project management system
+├── 📄 HomeMaintenanceTracker.tsx # Home maintenance tracking
 ├── ChatAgent/
 │   └── 📄 PlexAgent.ts      # AI context generation & API integration
 ├── auth/
@@ -160,6 +218,8 @@ src/
 ├── services/
 │   ├── 📄 conversationService.ts # Chat persistence
 │   └── 📄 projectService.ts     # Project data management
+├── utils/
+│   └── 📄 fractionConverter.ts  # Cooking fraction utilities ⭐ NEW
 └── components/
     └── 📄 VersionDisplay.tsx    # Version management
 ```
@@ -176,8 +236,8 @@ Each file contains:
 ### Prerequisites
 - Node.js 18+ and npm
 - MySQL 8.0+ database
-- Azure OpenAI API key
-- Plex Media Server (optional)
+- Azure OpenAI API key (GPT-4 or GPT-5)
+- Plex Media Server (optional, for media features)
 
 ### Installation
 
@@ -200,27 +260,45 @@ Each file contains:
    # Edit .env with your configuration
    AZURE_OPENAI_ENDPOINT=your_endpoint
    AZURE_OPENAI_KEY=your_api_key
+   AZURE_OPENAI_DEPLOYMENT=gpt-5-chat
    MYSQL_HOST=localhost
-   MYSQL_DATABASE=secretapp
+   MYSQL_USER=secretapp
+   MYSQL_PASSWORD=your_password
+   MYSQL_DATABASE=woodworking_projects
    PLEX_URL=your_plex_server_url
    PLEX_TOKEN=your_plex_token
    ```
 
 4. **Set up the database**
    ```bash
-   # Run database migrations
-   npm run db:migrate
+   # Create the database
+   mysql -u root -p -e "CREATE DATABASE woodworking_projects;"
    
-   # Seed with sample data (optional)
-   npm run db:seed
+   # Run all table creation scripts
+   mysql -u root -p woodworking_projects < create_myshop_table.sql
+   mysql -u root -p woodworking_projects < create_myshop_images_table.sql
+   mysql -u root -p woodworking_projects < create_conversations_tables.sql
+   mysql -u root -p woodworking_projects < create_recipe_manager_tables.sql
+   mysql -u root -p woodworking_projects < create_home_maintenance_tables.sql
+   mysql -u root -p woodworking_projects < setup_recipe_image_features.sql
+   
+   # Import sample data (optional)
+   node import_myshop_data.js
    ```
 
-5. **Start the development server**
+5. **Start the backend server**
+   ```bash
+   node server.js
+   # Server runs on http://localhost:3001
+   ```
+
+6. **Start the frontend development server** (in a new terminal)
    ```bash
    npm run dev
+   # Frontend runs on http://localhost:5173
    ```
 
-6. **Open your browser**
+7. **Open your browser**
    Navigate to `http://localhost:5173`
 
 ### Production Build
@@ -232,8 +310,11 @@ npm run build
 # Preview production build
 npm run preview
 
-# Deploy to your hosting platform
-npm run deploy
+# Deploy using PowerShell script (Windows)
+.\deploy.ps1
+
+# Or deploy with version tracking
+.\deploy-with-version.ps1
 ```
 
 ## 🔧 Configuration
@@ -248,6 +329,68 @@ npm run deploy
 2. Generate a Plex authentication token
 3. Add your server URL and token to the configuration
 
+## 🔌 API Endpoints
+
+### Recipe Management
+- `GET /api/recipes` - List all recipes with filtering
+- `GET /api/recipes/:id` - Get single recipe with ingredients
+- `POST /api/recipes` - Create new recipe
+- `PUT /api/recipes/:id` - Update existing recipe
+- `DELETE /api/recipes/:id` - Delete recipe
+- `POST /api/recipes/extract-from-text` - AI-powered recipe extraction
+
+### Recipe Images
+- `POST /api/recipes/:id/images` - Upload image (base64)
+- `GET /api/recipe-images/:imageId` - Retrieve image as BLOB
+- `DELETE /api/recipe-images/:imageId` - Delete image
+
+### Inventory Management
+- `GET /api/inventory` - List all tools
+- `GET /api/inventory/:id` - Get single tool
+- `POST /api/inventory` - Create new tool
+- `PUT /api/inventory/:id` - Update tool
+- `DELETE /api/inventory/:id` - Delete tool
+- `GET /api/inventory/stats/summary` - Inventory statistics
+
+### Inventory Images
+- `POST /api/inventory/:id/images` - Upload tool image
+- `GET /api/inventory/images/:imageId` - Retrieve tool image
+- `DELETE /api/inventory/images/:imageId` - Delete tool image
+
+### Woodworking Projects
+- `GET /api/projects` - List all projects with files
+- `GET /api/projects/:id` - Get single project
+- `POST /api/projects` - Create new project
+- `PUT /api/projects/:id` - Update project
+- `DELETE /api/projects/:id` - Delete project
+- `POST /api/projects/:id/files` - Upload project file
+- `GET /api/files/:fileId` - Download file
+- `DELETE /api/files/:fileId` - Delete file
+
+### Chat & Conversations
+- `GET /api/conversations` - List all conversations
+- `GET /api/conversations/:id` - Get conversation with messages
+- `POST /api/conversations` - Create new conversation
+- `POST /api/conversations/:id/messages` - Save messages
+- `POST /api/conversations/:id/message` - Add single message
+- `DELETE /api/conversations/:id` - Delete conversation
+
+### Plex Integration
+- `GET /api/plex/library` - Get Plex library content
+- `GET /api/plex/search` - Search for movies
+- `GET /api/plex/stats` - Get library statistics
+- `POST /api/plex/playlists` - Create playlist
+- `POST /api/plex/collections` - Create collection
+
+### AI Services
+- `POST /api/azure-openai/chat` - Chat completions with GPT-5
+
+### Home Maintenance
+- `GET /api/maintenance/items` - List maintenance items
+- `POST /api/maintenance/items` - Create maintenance item
+- `PUT /api/maintenance/items/:id` - Update item
+- `DELETE /api/maintenance/items/:id` - Delete item
+
 ### Database Schema
 The application uses MySQL with the following main tables:
 - `conversations` - Chat conversation metadata
@@ -256,6 +399,11 @@ The application uses MySQL with the following main tables:
 - `myshop_images` - Tool images and attachments
 - `woodworking_projects` - Project information
 - `project_files` - Project file attachments
+- `recipes` - Recipe data with cuisine, meal type, difficulty, ratings
+- `recipe_ingredients` - Ingredient details with quantities and units
+- `recipe_images` - Uploaded recipe images stored as BLOBs
+- `home_maintenance_items` - Home maintenance tracking
+- `maintenance_history` - Maintenance task history and scheduling
 
 ## 📊 Application Modules
 
@@ -271,7 +419,29 @@ The application uses MySQL with the following main tables:
 
 **Learning Focus**: React state management, API integration, real-time updates
 
-### 2. Shop Tool Manager (`MyShopTools.tsx`)
+### 2. Recipe Manager (`RecipeManager.tsx`) ⭐ NEW
+**Purpose**: Complete recipe management with AI-powered import
+
+**Features**:
+- AI recipe extraction from plain text using Azure OpenAI
+- Smart ingredient parsing (fractions, mixed formats, conversions)
+- Multiple image upload with BLOB storage
+- Recipe notes for tips and variations
+- Advanced filtering (cuisine, meal type, difficulty, ingredients)
+- Favorites and rating system
+- Responsive image gallery
+- Inline ingredient editing
+
+**Technical Highlights**:
+- Base64 image conversion and upload
+- JSON storage for ingredient arrays
+- Fraction-to-decimal conversion utilities
+- Natural language processing for recipe parsing
+- Complex state management with nested objects
+
+**Learning Focus**: AI integration, file uploads, complex forms, data parsing
+
+### 3. Shop Tool Manager (`MyShopTools.tsx`)
 **Purpose**: Complete inventory management for workshop tools
 
 **Features**:
@@ -283,7 +453,7 @@ The application uses MySQL with the following main tables:
 
 **Learning Focus**: Complex forms, file uploads, database operations
 
-### 3. Media Library Insights (`PlexMovieInsights.tsx`)
+### 4. Media Library Insights (`PlexMovieInsights.tsx`)
 **Purpose**: Movie discovery and library analytics
 
 **Features**:
@@ -295,7 +465,7 @@ The application uses MySQL with the following main tables:
 
 **Learning Focus**: External API integration, data visualization, performance optimization
 
-### 4. Project Workshop (`WoodworkingProjects.tsx`)
+### 5. Project Workshop (`WoodworkingProjects.tsx`)
 **Purpose**: Woodworking project management and tracking
 
 **Features**:
@@ -304,10 +474,32 @@ The application uses MySQL with the following main tables:
 - PDF viewing capabilities
 - Progress tracking and status updates
 - Material and cost tracking
+- Responsive grid-based image gallery (2/3/4 columns)
+- Smart date validation with user-friendly error messages
 
-**Learning Focus**: File handling, PDF integration, project management patterns
+**Recent Improvements** (Nov 2025):
+- Fixed date field reset issue when editing projects
+- Added comprehensive date validation with clear error messages
+- Optimized form layout for better UX (reduced textarea sizes)
+- Implemented responsive grid image gallery
+- Square aspect ratio for uniform image display
+- Click-to-enlarge image functionality
 
-### 5. Plex Intelligence Agent (`PlexAgent.ts`)
+**Learning Focus**: File handling, PDF integration, project management patterns, form validation
+
+### 6. Home Maintenance Tracker (`HomeMaintenanceTracker.tsx`)
+**Purpose**: Track home maintenance tasks and schedules
+
+**Features**:
+- Maintenance item management with schedules
+- Task history tracking
+- Due date monitoring and notifications
+- Categorized maintenance tasks
+- Cost tracking for repairs and maintenance
+
+**Learning Focus**: Date handling, recurring tasks, notification systems
+
+### 7. Plex Intelligence Agent (`PlexAgent.ts`)
 **Purpose**: Smart context generation for media-related AI queries
 
 **Features**:
@@ -318,6 +510,18 @@ The application uses MySQL with the following main tables:
 - External movie database integration
 
 **Learning Focus**: AI context generation, text processing, API orchestration
+
+### 8. Plex API Client (`PlexApiClient.tsx`)
+**Purpose**: Professional API testing interface for Plex servers
+
+**Features**:
+- Bruno-style API testing interface
+- Pre-configured Plex API endpoints
+- JSON response viewer with syntax highlighting
+- Request/response history
+- Backend proxy for secure token handling
+
+**Learning Focus**: API testing patterns, UI for developers, security practices
 
 ## 🎓 Educational Use Cases
 
@@ -352,6 +556,64 @@ The application uses MySQL with the following main tables:
 - **Integration Tests**: API and database testing
 - **E2E Tests**: Full user workflow testing
 - **Performance Tests**: Load and stress testing
+
+## 🧪 Testing & Troubleshooting
+
+### Recipe Manager Testing
+```bash
+# Test recipe creation
+# 1. Open Recipe Manager
+# 2. Click "+" to add new recipe
+# 3. Fill in title and instructions
+# 4. Click "Upload Images" and select files
+# 5. Add notes in the notes field
+# 6. Save and verify
+
+# Test AI import
+# 1. Click "Import from Text"
+# 2. Paste recipe text with ingredients and notes
+# 3. Click "Parse Recipe"
+# 4. Verify extraction accuracy
+# 5. Edit if needed and save
+```
+
+### Database Verification
+```bash
+# Check if tables exist
+mysql -u root -p woodworking_projects -e "SHOW TABLES;"
+
+# Verify recipe_images table
+mysql -u root -p woodworking_projects -e "DESCRIBE recipe_images;"
+
+# Check for recipes with images
+mysql -u root -p woodworking_projects -e "SELECT id, title, images FROM recipes WHERE images IS NOT NULL;"
+```
+
+### Common Issues
+
+#### Images not uploading
+- **Check**: Server is running on port 3001
+- **Verify**: `recipe_images` table exists
+- **Test**: Upload a small image (< 1MB) first
+- **Solution**: Restart both frontend and backend servers
+
+#### Date format errors
+- **Issue**: "Incorrect date format" when editing projects
+- **Cause**: Date not in YYYY-MM-DD format
+- **Solution**: Use date picker or enter dates as YYYY-MM-DD
+- **Fixed**: Version 1.3.0+ includes automatic date formatting
+
+#### AI recipe parsing fails
+- **Check**: Azure OpenAI API key is valid
+- **Verify**: Deployment name is correct in server.js
+- **Test**: Try with a simple recipe first
+- **Limit**: Very complex recipes may need manual editing
+
+#### MySQL connection errors
+- **Check**: MySQL service is running
+- **Verify**: Credentials in server.js are correct
+- **Test**: `mysql -u secretapp -p woodworking_projects`
+- **Solution**: Ensure user has proper permissions
 
 ### Deployment Pipeline
 - **Development**: Local development with hot reload
@@ -413,6 +675,88 @@ We welcome contributions from developers of all skill levels! This project is de
 - **Testing**: Include tests for new functionality
 - **Documentation**: Update README and code comments
 - **Performance**: Consider performance implications
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 📚 Additional Documentation
+
+### Quick Start Guides
+- **Recipe Manager Setup**: See `RECIPE_FEATURES_QUICKSTART.md` for recipe feature setup
+- **Image Upload Feature**: See `IMAGE_UPLOAD_FEATURE.md` for detailed image upload documentation
+- **Quick Setup**: See `QUICK_SETUP_IMAGES.md` for one-command setup
+
+### Technical Documentation
+- **Recipe Features**: See `docs/RECIPE_IMAGES_NOTES_FEATURE.md` for complete technical details
+- **Woodworking Fixes**: See `docs/WOODWORKING_PROJECTS_FIXES.md` for recent bug fixes
+- **Deployment Guide**: See `docs/DEPLOYMENT_GUIDE.md` for deployment instructions
+- **Plex Integration**: See `docs/PLEX_CHATBOT_INTEGRATION.md` for Plex setup
+- **Educational Guide**: See `EDUCATIONAL_GUIDE.md` for learning resources
+
+### Database Migrations
+- `add_recipe_images_migration.sql` - Add images JSON column
+- `create_recipe_images_table.sql` - Create BLOB storage table
+- `setup_recipe_image_features.sql` - Complete recipe image setup
+- `create_recipe_manager_tables.sql` - Full recipe database schema
+- `create_myshop_table.sql` - Tool inventory tables
+- `create_home_maintenance_tables.sql` - Maintenance tracking tables
+
+### Deployment Scripts
+- `deploy.ps1` - Standard production deployment
+- `deploy-with-version.ps1` - Deployment with version tracking
+- `quick-deploy.ps1` - Fast deployment for quick fixes
+- `increment-version.ps1` - Version number management
+
+## 🎓 Learning Resources
+
+### Code Examples
+The codebase contains extensive examples of:
+- **React Hooks**: useState, useEffect, useMemo, useCallback, useRef
+- **TypeScript Patterns**: Interfaces, generics, type guards, utility types
+- **Material-UI**: Advanced component usage, theming, responsive design
+- **API Integration**: REST APIs, file uploads, error handling
+- **Database Design**: Relational modeling, JSON columns, BLOB storage
+- **AI Integration**: Context generation, prompt engineering, streaming responses
+- **File Handling**: Upload, download, preview, BLOB storage
+- **Form Management**: Validation, error handling, complex nested forms
+- **State Management**: Complex state, nested updates, optimistic updates
+
+### Real-World Patterns
+- **Image Upload Pipeline**: FileReader → Base64 → Server → BLOB → URL
+- **Recipe Parsing**: Text → AI → Structured Data → Database
+- **Date Validation**: Input → Regex → Date Object → MySQL Format
+- **Responsive Grids**: Breakpoints → Column Calculations → Layout
+- **Error Handling**: Try-Catch → User Messages → Logging
+
+## 🚀 Deployment
+
+### Development
+```bash
+# Frontend (Vite dev server with HMR)
+npm run dev
+
+# Backend (Node.js server)
+node server.js
+```
+
+### Production
+```bash
+# Build frontend
+npm run build
+
+# Deploy (Windows PowerShell)
+.\deploy-with-version.ps1
+
+# Or manual deployment
+Copy-Item -Path dist\* -Destination C:\inetpub\wwwroot\secretapp\ -Recurse -Force
+```
+
+### Version Management
+The app uses automatic version tracking:
+- `version.json` - Version number, build count, commit hash
+- Auto-increments on deployment
+- Displayed in UI footer
 
 ## 📄 License
 
