@@ -58,9 +58,11 @@ interface Recipe {
   servings?: number
   difficulty_level?: string
   instructions?: string
+  notes?: string
   tags?: string
   is_favorite?: boolean
   rating?: number
+  images?: string[]
   created_at?: string
   updated_at?: string
   ingredients?: Ingredient[]
@@ -95,9 +97,11 @@ export default function RecipeManager() {
     servings: 4,
     difficulty_level: 'medium',
     instructions: '',
+    notes: '',
     tags: '',
     is_favorite: false,
     rating: 0,
+    images: [],
     ingredients: []
   })
   
@@ -118,6 +122,9 @@ export default function RecipeManager() {
   const [isTextImportDialogOpen, setIsTextImportDialogOpen] = useState(false)
   const [importText, setImportText] = useState('')
   const [isImportingText, setIsImportingText] = useState(false)
+  
+  // State for image upload
+  const [uploadingImages, setUploadingImages] = useState(false)
 
   const parseQuantity = (value: unknown): number => {
     if (typeof value === 'number' && !Number.isNaN(value)) return value
@@ -175,9 +182,11 @@ export default function RecipeManager() {
       servings: typeof extractedRecipe.servings === 'number' ? extractedRecipe.servings : 4,
       difficulty_level: extractedRecipe.difficulty_level || 'medium',
       instructions,
+      notes: extractedRecipe.notes || '',
       tags: extractedRecipe.tags || '',
       is_favorite: false,
       rating: 0,
+      images: [],
       ingredients: normalizedIngredients
     })
 
@@ -216,6 +225,7 @@ export default function RecipeManager() {
       const method = isEditMode ? 'PUT' : 'POST'
       const url = isEditMode ? `/api/recipes/${selectedRecipe?.id}` : '/api/recipes'
       
+      // First save the recipe
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -223,6 +233,66 @@ export default function RecipeManager() {
       })
       
       if (!response.ok) throw new Error('Failed to save recipe')
+      
+      const result = await response.json()
+      const recipeId = isEditMode ? selectedRecipe?.id : result.id
+      
+      // Upload any base64 images (newly added images from file upload)
+      if (recipeForm.images && recipeForm.images.length > 0) {
+        const uploadedImageUrls: string[] = []
+        
+        for (const imageData of recipeForm.images) {
+          // Check if it's a base64 image (starts with data:)
+          if (imageData.startsWith('data:')) {
+            // Extract file info
+            const matches = imageData.match(/^data:(.+?);base64,(.*)$/)
+            if (matches) {
+              const fileType = matches[1]
+              const base64Data = matches[2]
+              const fileName = `recipe-${recipeId}-${Date.now()}.${fileType.split('/')[1]}`
+              
+              // Upload image to server
+              console.log(`Uploading image to /api/recipes/${recipeId}/images`)
+              const uploadResponse = await fetch(`/api/recipes/${recipeId}/images`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  fileName,
+                  fileData: base64Data,
+                  fileType
+                })
+              })
+              
+              console.log(`Upload response status: ${uploadResponse.status}`)
+              
+              if (uploadResponse.ok) {
+                const uploadResult = await uploadResponse.json()
+                console.log('Upload result:', uploadResult)
+                uploadedImageUrls.push(uploadResult.imageUrl)
+              } else {
+                const errorText = await uploadResponse.text()
+                console.error(`Failed to upload image: ${uploadResponse.status} - ${errorText}`)
+                throw new Error(`Image upload failed: ${uploadResponse.status}`)
+              }
+            }
+          } else {
+            // It's already a URL, keep it
+            uploadedImageUrls.push(imageData)
+          }
+        }
+        
+        // Update recipe with uploaded image URLs
+        if (uploadedImageUrls.length > 0) {
+          await fetch(`/api/recipes/${recipeId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...recipeForm,
+              images: uploadedImageUrls
+            })
+          })
+        }
+      }
       
       setSuccess(isEditMode ? 'Recipe updated successfully!' : 'Recipe created successfully!')
       closeRecipeDialog()
@@ -291,9 +361,11 @@ export default function RecipeManager() {
         servings: recipe.servings || 4,
         difficulty_level: recipe.difficulty_level || 'medium',
         instructions: recipe.instructions || '',
+        notes: recipe.notes || '',
         tags: recipe.tags || '',
         is_favorite: recipe.is_favorite || false,
         rating: recipe.rating || 0,
+        images: recipe.images || [],
         ingredients: recipe.ingredients || []
       })
       setIsEditMode(true)
@@ -309,9 +381,11 @@ export default function RecipeManager() {
         servings: 4,
         difficulty_level: 'medium',
         instructions: '',
+        notes: '',
         tags: '',
         is_favorite: false,
         rating: 0,
+        images: [],
         ingredients: []
       })
       setIsEditMode(false)
@@ -488,6 +562,38 @@ export default function RecipeManager() {
     setIsImportingText(false)
   }
   
+  // Handle image file upload
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    setUploadingImages(true)
+    try {
+      const imageUrls: string[] = []
+      
+      for (const file of files) {
+        // Convert file to base64
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result as string)
+          reader.readAsDataURL(file)
+        })
+        
+        // Create a data URL for preview (temporary - will be replaced with uploaded URL after save)
+        imageUrls.push(base64)
+      }
+      
+      setRecipeForm(prev => ({
+        ...prev,
+        images: [...(prev.images || []), ...imageUrls]
+      }))
+    } catch (err) {
+      setError('Failed to process images')
+    } finally {
+      setUploadingImages(false)
+    }
+  }
+  
   // Filter recipes based on search
   const filteredRecipes = recipes.filter(recipe => {
     const matchesSearch = searchTerm === '' || 
@@ -592,6 +698,31 @@ export default function RecipeManager() {
               }
             }}
           >
+            {/* Recipe Image */}
+            {recipe.images && recipe.images.length > 0 && (
+              <Box
+                sx={{
+                  width: '100%',
+                  height: 200,
+                  backgroundColor: '#f5f5f5',
+                  overflow: 'hidden'
+                }}
+              >
+                <img
+                  src={recipe.images[0]}
+                  alt={recipe.title}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover'
+                  }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none'
+                  }}
+                />
+              </Box>
+            )}
+            
             <CardContent sx={{ flexGrow: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
                 <Typography variant="h6" component="h3" sx={{ flexGrow: 1 }}>
@@ -867,6 +998,127 @@ export default function RecipeManager() {
               )}
             </Box>
             
+            {/* Notes Section */}
+            <TextField
+              fullWidth
+              label="Recipe Notes"
+              value={recipeForm.notes || ''}
+              onChange={(e) => setRecipeForm({ ...recipeForm, notes: e.target.value })}
+              multiline
+              rows={3}
+              placeholder="Add any special notes, tips, or variations for this recipe..."
+              helperText="Optional notes about the recipe (e.g., substitutions, tips, variations)"
+            />
+            
+            {/* Images Section */}
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Images
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2, flexDirection: 'column' }}>
+                {/* File Upload Button */}
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                  <Button
+                    variant="outlined"
+                    component="label"
+                    disabled={uploadingImages}
+                    sx={{ minWidth: 200 }}
+                  >
+                    {uploadingImages ? 'Processing...' : 'Upload Images'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      hidden
+                      onChange={handleImageUpload}
+                    />
+                  </Button>
+                  <Typography variant="caption" color="text.secondary">
+                    or add URL below
+                  </Typography>
+                </Box>
+                
+                <TextField
+                  fullWidth
+                  label="Add Image URL"
+                  placeholder="https://example.com/image.jpg"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      const input = e.target as HTMLInputElement
+                      const url = input.value.trim()
+                      if (url) {
+                        setRecipeForm({ 
+                          ...recipeForm, 
+                          images: [...(recipeForm.images || []), url] 
+                        })
+                        input.value = ''
+                      }
+                    }
+                  }}
+                  helperText="Press Enter to add image URL"
+                />
+                {recipeForm.images && recipeForm.images.length > 0 && (
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                    {recipeForm.images.map((imageUrl, index) => (
+                      <Box 
+                        key={index} 
+                        sx={{ 
+                          position: 'relative',
+                          width: 120,
+                          height: 120,
+                          border: '2px solid #e0e0e0',
+                          borderRadius: 1,
+                          overflow: 'hidden'
+                        }}
+                      >
+                        <img 
+                          src={imageUrl} 
+                          alt={`Recipe ${index + 1}`}
+                          style={{ 
+                            width: '100%', 
+                            height: '100%', 
+                            objectFit: 'cover' 
+                          }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="120" height="120"%3E%3Crect width="120" height="120" fill="%23ddd"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="14" fill="%23999"%3ENo Image%3C/text%3E%3C/svg%3E'
+                          }}
+                        />
+                        <IconButton
+                          size="small"
+                          sx={{
+                            position: 'absolute',
+                            top: 4,
+                            right: 4,
+                            backgroundColor: 'rgba(255,255,255,0.9)',
+                            '&:hover': { backgroundColor: 'rgba(255,255,255,1)' }
+                          }}
+                          onClick={() => {
+                            const newImages = [...(recipeForm.images || [])]
+                            newImages.splice(index, 1)
+                            setRecipeForm({ ...recipeForm, images: newImages })
+                          }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                        {index === 0 && (
+                          <Chip
+                            label="Main"
+                            size="small"
+                            color="primary"
+                            sx={{
+                              position: 'absolute',
+                              bottom: 4,
+                              left: 4
+                            }}
+                          />
+                        )}
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </Box>
+            </Box>
+            
             <TextField
               fullWidth
               label="Instructions"
@@ -964,22 +1216,51 @@ export default function RecipeManager() {
                 </Box>
               )}
 
-              {/* Ingredients */}
-              {selectedRecipe.ingredients && selectedRecipe.ingredients.length > 0 && (
-                <Box sx={{ mb: 3 }}>
-                  <Typography variant="h6" gutterBottom>
-                    Ingredients ({selectedRecipe.ingredients.length})
-                  </Typography>
-                  <Box sx={{ pl: 2 }}>
-                    {selectedRecipe.ingredients.map((ingredient, index) => (
-                      <Typography key={index} variant="body1" sx={{ mb: 0.5 }}>
-                        • <strong>{decimalToCookingFraction(ingredient.quantity)} {ingredient.unit}</strong> {ingredient.ingredient_name}
-                        {ingredient.notes && ` (${ingredient.notes})`}
-                      </Typography>
-                    ))}
+              {/* Ingredients and First Image - Side by Side */}
+              <Box sx={{ display: 'flex', gap: 3, mb: 3, flexWrap: 'wrap' }}>
+                {/* Ingredients */}
+                {selectedRecipe.ingredients && selectedRecipe.ingredients.length > 0 && (
+                  <Box sx={{ flex: '1 1 300px', minWidth: 0 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Ingredients ({selectedRecipe.ingredients.length})
+                    </Typography>
+                    <Box sx={{ pl: 2 }}>
+                      {selectedRecipe.ingredients.map((ingredient, index) => (
+                        <Typography key={index} variant="body1" sx={{ mb: 0.5 }}>
+                          • <strong>{decimalToCookingFraction(ingredient.quantity)} {ingredient.unit}</strong> {ingredient.ingredient_name}
+                          {ingredient.notes && ` (${ingredient.notes})`}
+                        </Typography>
+                      ))}
+                    </Box>
                   </Box>
-                </Box>
-              )}
+                )}
+                
+                {/* First Image - To the right of ingredients */}
+                {selectedRecipe.images && selectedRecipe.images.length > 0 && (
+                  <Box 
+                    sx={{ 
+                      flex: '0 0 300px',
+                      maxWidth: 300,
+                      height: 'fit-content'
+                    }}
+                  >
+                    <img
+                      src={selectedRecipe.images[0]}
+                      alt={selectedRecipe.title}
+                      style={{
+                        width: '100%',
+                        height: 'auto',
+                        maxHeight: 400,
+                        objectFit: 'cover',
+                        borderRadius: 8
+                      }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none'
+                      }}
+                    />
+                  </Box>
+                )}
+              </Box>
 
               {/* Instructions */}
               {selectedRecipe.instructions && (
@@ -1018,13 +1299,64 @@ export default function RecipeManager() {
                 </Box>
               )}
 
+              {/* Notes Section */}
+              {selectedRecipe.notes && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="h6" gutterBottom>Notes</Typography>
+                  <Typography variant="body1" sx={{ 
+                    p: 2, 
+                    backgroundColor: '#f5f5f5', 
+                    borderRadius: 1,
+                    whiteSpace: 'pre-wrap'
+                  }}>
+                    {selectedRecipe.notes}
+                  </Typography>
+                </Box>
+              )}
+
               {/* Tags */}
               {selectedRecipe.tags && (
-                <Box>
+                <Box sx={{ mb: 3 }}>
                   <Typography variant="h6" gutterBottom>Tags</Typography>
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                     {selectedRecipe.tags.split(',').map((tag, index) => (
                       <Chip key={index} label={tag.trim()} size="small" variant="outlined" />
+                    ))}
+                  </Box>
+                </Box>
+              )}
+              
+              {/* Additional Images - At the bottom */}
+              {selectedRecipe.images && selectedRecipe.images.length > 1 && (
+                <Box>
+                  <Typography variant="h6" gutterBottom>
+                    Additional Images ({selectedRecipe.images.length - 1})
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                    {selectedRecipe.images.slice(1).map((imageUrl, index) => (
+                      <Box
+                        key={index}
+                        sx={{
+                          width: 200,
+                          height: 200,
+                          overflow: 'hidden',
+                          borderRadius: 1,
+                          border: '1px solid #e0e0e0'
+                        }}
+                      >
+                        <img
+                          src={imageUrl}
+                          alt={`${selectedRecipe.title} - Image ${index + 2}`}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none'
+                          }}
+                        />
+                      </Box>
                     ))}
                   </Box>
                 </Box>

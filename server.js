@@ -2183,7 +2183,14 @@ app.get('/api/recipes', async (req, res) => {
     query += ' GROUP BY r.id ORDER BY r.created_at DESC'
     
     const [recipes] = await pool.query(query, params)
-    res.json(recipes)
+    
+    // Parse JSON fields for each recipe
+    const parsedRecipes = recipes.map(recipe => ({
+      ...recipe,
+      images: recipe.images ? (typeof recipe.images === 'string' ? JSON.parse(recipe.images) : recipe.images) : []
+    }))
+    
+    res.json(parsedRecipes)
   } catch (error) {
     console.error('Get recipes error:', error)
     res.status(500).json({ error: error.message })
@@ -2205,7 +2212,14 @@ app.get('/api/recipes/:id', async (req, res) => {
       [id]
     )
     
-    res.json({ ...recipe, ingredients })
+    // Parse images JSON field
+    const parsedRecipe = {
+      ...recipe,
+      images: recipe.images ? (typeof recipe.images === 'string' ? JSON.parse(recipe.images) : recipe.images) : [],
+      ingredients
+    }
+    
+    res.json(parsedRecipe)
   } catch (error) {
     console.error('Get recipe error:', error)
     res.status(500).json({ error: error.message })
@@ -2218,23 +2232,28 @@ app.post('/api/recipes', async (req, res) => {
     const {
       title, description, cuisine_type, meal_type, prep_time_minutes,
       cook_time_minutes, servings, difficulty_level, instructions, notes,
-      source_url, image_url, tags, ingredients
+      source_url, image_url, tags, images, ingredients
     } = req.body
     
     if (!title || !instructions) {
       return res.status(400).json({ error: 'Title and instructions are required' })
     }
     
+    // Handle images: prioritize images array, fallback to image_url for backward compatibility
+    const imagesJson = images && Array.isArray(images) && images.length > 0 
+      ? JSON.stringify(images) 
+      : (image_url ? JSON.stringify([image_url]) : null)
+    
     // Insert recipe
     const [result] = await pool.query(
       `INSERT INTO recipes (
         title, description, cuisine_type, meal_type, prep_time_minutes,
         cook_time_minutes, servings, difficulty_level, instructions, notes,
-        source_url, image_url, dietary_tags
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        source_url, image_url, images, dietary_tags
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [title, description, cuisine_type, meal_type, prep_time_minutes,
        cook_time_minutes, servings, difficulty_level, instructions, notes,
-       source_url, image_url, JSON.stringify(tags)]
+       source_url, image_url, imagesJson, JSON.stringify(tags)]
     )
     
     const recipeId = result.insertId
@@ -2263,7 +2282,7 @@ app.put('/api/recipes/:id', async (req, res) => {
     const {
       title, description, cuisine_type, meal_type, prep_time_minutes,
       cook_time_minutes, servings, difficulty_level, instructions, notes,
-      source_url, image_url, tags, is_favorite, rating, ingredients
+      source_url, image_url, tags, is_favorite, rating, images, ingredients
     } = req.body
     
     // Check if recipe exists
@@ -2272,17 +2291,22 @@ app.put('/api/recipes/:id', async (req, res) => {
       return res.status(404).json({ error: 'Recipe not found' })
     }
     
+    // Handle images: prioritize images array, fallback to image_url for backward compatibility
+    const imagesJson = images && Array.isArray(images) && images.length > 0 
+      ? JSON.stringify(images) 
+      : (image_url ? JSON.stringify([image_url]) : null)
+    
     // Update recipe
     await pool.query(
       `UPDATE recipes SET
         title = ?, description = ?, cuisine_type = ?, meal_type = ?,
         prep_time_minutes = ?, cook_time_minutes = ?, servings = ?,
         difficulty_level = ?, instructions = ?, notes = ?, source_url = ?,
-        image_url = ?, dietary_tags = ?, is_favorite = ?, rating = ?
+        image_url = ?, images = ?, dietary_tags = ?, is_favorite = ?, rating = ?
       WHERE id = ?`,
       [title, description, cuisine_type, meal_type, prep_time_minutes,
        cook_time_minutes, servings, difficulty_level, instructions, notes,
-       source_url, image_url, JSON.stringify(tags), is_favorite, rating, id]
+       source_url, image_url, imagesJson, JSON.stringify(tags), is_favorite, rating, id]
     )
     
     // Update ingredients if provided
@@ -2302,6 +2326,78 @@ app.put('/api/recipes/:id', async (req, res) => {
     res.json({ message: 'Recipe updated successfully' })
   } catch (error) {
     console.error('Update recipe error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Upload recipe image
+app.post('/api/recipes/:id/images', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { fileName, fileData, fileType } = req.body
+    
+    if (!fileName || !fileData || !fileType) {
+      return res.status(400).json({ error: 'Missing required fields: fileName, fileData, fileType' })
+    }
+    
+    const buffer = Buffer.from(fileData, 'base64')
+    const fileSize = buffer.length
+    
+    console.log(`Uploading recipe image: ${fileName}, size: ${fileSize} bytes, type: ${fileType}`)
+    
+    const [result] = await pool.query(
+      'INSERT INTO recipe_images (recipe_id, file_name, file_data, file_type, file_size) VALUES (?, ?, ?, ?, ?)',
+      [id, fileName, buffer, fileType, fileSize]
+    )
+    
+    res.json({ 
+      success: true, 
+      imageId: result.insertId,
+      imageUrl: `/api/recipe-images/${result.insertId}`,
+      fileName,
+      fileType,
+      fileSize
+    })
+  } catch (error) {
+    console.error('Recipe image upload error:', error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Get recipe image
+app.get('/api/recipe-images/:imageId', async (req, res) => {
+  try {
+    const { imageId } = req.params
+    const [[image]] = await pool.query(
+      'SELECT file_name, file_data, file_type FROM recipe_images WHERE id = ?',
+      [imageId]
+    )
+    
+    if (!image) {
+      return res.status(404).json({ error: 'Image not found' })
+    }
+    
+    res.setHeader('Content-Type', image.file_type)
+    res.setHeader('Content-Disposition', `inline; filename="${image.file_name}"`)
+    res.send(image.file_data)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// Delete recipe image
+app.delete('/api/recipe-images/:imageId', async (req, res) => {
+  try {
+    const { imageId } = req.params
+    
+    const [result] = await pool.query('DELETE FROM recipe_images WHERE id = ?', [imageId])
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Image not found' })
+    }
+    
+    res.json({ message: 'Image deleted successfully' })
+  } catch (error) {
+    console.error('Delete recipe image error:', error)
     res.status(500).json({ error: error.message })
   }
 })
@@ -3060,6 +3156,7 @@ app.post('/api/recipes/extract-from-text', async (req, res) => {
   "servings": number or 4,
   "difficulty_level": "easy/medium/hard",
   "instructions": "step by step instructions as a single string with numbered steps",
+  "notes": "any special notes, tips, substitutions, or variations mentioned in the recipe",
   "ingredients": [
     {
       "ingredient_name": "name of ingredient",
@@ -3071,7 +3168,7 @@ app.post('/api/recipes/extract-from-text', async (req, res) => {
   "tags": "comma-separated tags"
 }
 
-Always respond with ONLY the JSON object. Do not invent ingredients or steps that are not in the text. If quantities are given as fractions, convert them to decimal numbers with up to two decimal places.`
+Always respond with ONLY the JSON object. Do not invent ingredients or steps that are not in the text. If quantities are given as fractions, convert them to decimal numbers with up to two decimal places. Extract any notes, tips, or special instructions into the "notes" field.`
       },
       {
         role: 'user',

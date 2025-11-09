@@ -221,6 +221,27 @@ export default function WoodworkingProjects() {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString()
   }
+  
+  // Convert date to YYYY-MM-DD format for input fields
+  const formatDateForInput = (dateString: string): string => {
+    if (!dateString) return new Date().toISOString().split('T')[0]
+    
+    // If already in YYYY-MM-DD format, return as is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return dateString
+    }
+    
+    // Try to parse the date and convert to YYYY-MM-DD
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        return new Date().toISOString().split('T')[0]
+      }
+      return date.toISOString().split('T')[0]
+    } catch {
+      return new Date().toISOString().split('T')[0]
+    }
+  }
 
   const testConnection = async () => {
     try {
@@ -252,7 +273,7 @@ export default function WoodworkingProjects() {
   const handleEdit = (project: WoodworkingProject) => {
     setFormData({
       title: project.title,
-      date: project.date,
+      date: formatDateForInput(project.date), // Convert date to YYYY-MM-DD format
       materials: project.materials || '',
       description: project.description || '',
       status: project.status,
@@ -327,6 +348,23 @@ export default function WoodworkingProjects() {
    */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+    if (formData.date && !dateRegex.test(formData.date)) {
+      setError('Invalid date format. Please use the date picker or enter a date in YYYY-MM-DD format.')
+      return
+    }
+    
+    // Validate date is a valid date
+    if (formData.date) {
+      const dateObj = new Date(formData.date)
+      if (isNaN(dateObj.getTime())) {
+        setError('Invalid date. Please enter a valid date.')
+        return
+      }
+    }
+    
     try {
       let projectId: string
 
@@ -383,7 +421,8 @@ export default function WoodworkingProjects() {
 
       await loadProjects()
     } catch (err) {
-      setError('Failed to save project')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save project'
+      setError(errorMessage)
     }
   }
 
@@ -787,7 +826,7 @@ export default function WoodworkingProjects() {
                     value={formData.materials}
                     onChange={handleInputChange}
                     multiline
-                    rows={3}
+                    rows={2}
                     fullWidth
                     variant="outlined"
                     placeholder="List the materials needed..."
@@ -799,7 +838,7 @@ export default function WoodworkingProjects() {
                     value={formData.description}
                     onChange={handleInputChange}
                     multiline
-                    rows={5}
+                    rows={3}
                     fullWidth
                     variant="outlined"
                     placeholder="Describe your project..."
@@ -1041,19 +1080,47 @@ export default function WoodworkingProjects() {
                         <Paperclip className="w-4 h-4" />
                         Attached Files ({selectedProject.files.length})
                       </Typography>
-                      <Stack spacing={2}>
+                      <Box sx={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: { 
+                          xs: 'repeat(2, 1fr)',  // 2 columns on mobile
+                          sm: 'repeat(3, 1fr)',  // 3 columns on tablets
+                          md: 'repeat(4, 1fr)'   // 4 columns on desktop
+                        }, 
+                        gap: 2 
+                      }}>
                         {selectedProject.files.map((file: ProjectFile) => (
-                          <Paper key={file.id} elevation={2} sx={{ p: 2 }}>
+                          <Paper key={file.id} elevation={2} sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
                             {file.file_type.startsWith('image/') ? (
-                              <Box sx={{ mb: 2 }}>
+                              <Box sx={{ 
+                                mb: 1, 
+                                aspectRatio: '1', 
+                                overflow: 'hidden', 
+                                borderRadius: 1,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                bgcolor: 'grey.100'
+                              }}>
                                 <img 
                                   src={projectService.getFileUrl(file.id!)} 
                                   alt={file.file_name} 
-                                  style={{ maxWidth: '100%', borderRadius: '8px' }} 
+                                  style={{ 
+                                    width: '100%', 
+                                    height: '100%', 
+                                    objectFit: 'cover',
+                                    cursor: 'pointer'
+                                  }}
+                                  onClick={() => window.open(projectService.getFileUrl(file.id!), '_blank')}
                                 />
                               </Box>
                             ) : file.file_type === 'application/pdf' && file.id ? (
-                              <Box sx={{ mb: 2 }}>
+                              <Box sx={{ 
+                                mb: 1, 
+                                aspectRatio: '1',
+                                overflow: 'hidden', 
+                                borderRadius: 1 
+                              }}>
                                 <PdfAttachmentViewer file={file} />
                               </Box>
                             ) : (
@@ -1061,39 +1128,59 @@ export default function WoodworkingProjects() {
                                 display: 'flex', 
                                 alignItems: 'center', 
                                 justifyContent: 'center',
-                                p: 4, 
+                                aspectRatio: '1',
                                 bgcolor: 'grey.100', 
-                                borderRadius: 2,
-                                mb: 2
+                                borderRadius: 1,
+                                mb: 1
                               }}>
                                 <Paperclip className="w-8 h-8" />
                               </Box>
                             )}
                             
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Typography variant="body2" sx={{ flex: 1 }}>
-                                {file.file_name}
-                              </Typography>
+                            <Typography 
+                              variant="caption" 
+                              sx={{ 
+                                mb: 1, 
+                                overflow: 'hidden', 
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}
+                              title={file.file_name}
+                            >
+                              {file.file_name}
+                            </Typography>
+                            
+                            <Box sx={{ display: 'flex', gap: 0.5 }}>
                               <Button
                                 size="small"
                                 href={projectService.getFileUrl(file.id!)}
                                 target="_blank"
-                                startIcon={<Download className="w-4 h-4" />}
+                                sx={{ 
+                                  minWidth: 'auto', 
+                                  p: 0.5,
+                                  flex: 1,
+                                  fontSize: '0.7rem'
+                                }}
                               >
-                                Download
+                                <Download className="w-3 h-3" />
                               </Button>
                               <Button
                                 size="small"
                                 color="error"
                                 onClick={() => handleDeleteFile(file.id!)}
-                                startIcon={<Trash2 className="w-4 h-4" />}
+                                sx={{ 
+                                  minWidth: 'auto', 
+                                  p: 0.5,
+                                  flex: 1,
+                                  fontSize: '0.7rem'
+                                }}
                               >
-                                Delete
+                                <Trash2 className="w-3 h-3" />
                               </Button>
                             </Box>
                           </Paper>
                         ))}
-                      </Stack>
+                      </Box>
                     </Box>
                   )}
                 </Stack>
