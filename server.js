@@ -2239,13 +2239,25 @@ app.post('/api/recipes', async (req, res) => {
       return res.status(400).json({ error: 'Title and instructions are required' })
     }
     
+    // Handle meal_type: if it contains comma, take only the first value (ENUM limitation)
+    const cleanMealType = meal_type ? meal_type.split(',')[0].trim() : 'dinner'
+    
     // Handle images: prioritize images array, fallback to image_url for backward compatibility
     const imagesJson = images && Array.isArray(images) && images.length > 0 
       ? JSON.stringify(images) 
       : (image_url ? JSON.stringify([image_url]) : null)
     
-    // Handle tags: if it's already a string, use it; if array, stringify it
-    const tagsJson = tags ? (typeof tags === 'string' ? tags : JSON.stringify(tags)) : null
+    // Handle tags: convert to proper JSON array format for dietary_tags column
+    let tagsJson = null
+    if (tags) {
+      if (typeof tags === 'string') {
+        // Split comma-separated string into array and stringify
+        const tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+        tagsJson = JSON.stringify(tagsArray)
+      } else if (Array.isArray(tags)) {
+        tagsJson = JSON.stringify(tags)
+      }
+    }
     
     // Insert recipe
     const [result] = await pool.query(
@@ -2254,7 +2266,7 @@ app.post('/api/recipes', async (req, res) => {
         cook_time_minutes, servings, difficulty_level, instructions, notes,
         source_url, image_url, images, dietary_tags
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [title, description, cuisine_type, meal_type, prep_time_minutes,
+      [title, description, cuisine_type, cleanMealType, prep_time_minutes,
        cook_time_minutes, servings, difficulty_level, instructions, notes,
        source_url, image_url, imagesJson, tagsJson]
     )
@@ -2294,13 +2306,25 @@ app.put('/api/recipes/:id', async (req, res) => {
       return res.status(404).json({ error: 'Recipe not found' })
     }
     
+    // Handle meal_type: if it contains comma, take only the first value (ENUM limitation)
+    const cleanMealType = meal_type ? meal_type.split(',')[0].trim() : 'dinner'
+    
     // Handle images: prioritize images array, fallback to image_url for backward compatibility
     const imagesJson = images && Array.isArray(images) && images.length > 0 
       ? JSON.stringify(images) 
       : (image_url ? JSON.stringify([image_url]) : null)
     
-    // Handle tags: if it's already a string, use it; if array, stringify it
-    const tagsJson = tags ? (typeof tags === 'string' ? tags : JSON.stringify(tags)) : null
+    // Handle tags: convert to proper JSON array format for dietary_tags column
+    let tagsJson = null
+    if (tags) {
+      if (typeof tags === 'string') {
+        // Split comma-separated string into array and stringify
+        const tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+        tagsJson = JSON.stringify(tagsArray)
+      } else if (Array.isArray(tags)) {
+        tagsJson = JSON.stringify(tags)
+      }
+    }
     
     // Update recipe
     await pool.query(
@@ -2310,7 +2334,7 @@ app.put('/api/recipes/:id', async (req, res) => {
         difficulty_level = ?, instructions = ?, notes = ?, source_url = ?,
         image_url = ?, images = ?, dietary_tags = ?, is_favorite = ?, rating = ?
       WHERE id = ?`,
-      [title, description, cuisine_type, meal_type, prep_time_minutes,
+      [title, description, cuisine_type, cleanMealType, prep_time_minutes,
        cook_time_minutes, servings, difficulty_level, instructions, notes,
        source_url, image_url, imagesJson, tagsJson, is_favorite, rating, id]
     )
