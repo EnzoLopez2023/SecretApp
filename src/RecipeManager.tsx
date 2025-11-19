@@ -20,7 +20,8 @@ import {
   Alert,
   Snackbar,
   CircularProgress,
-  Fab
+  Fab,
+  Link
 } from '@mui/material'
 
 import {
@@ -31,8 +32,29 @@ import {
   FavoriteBorder as FavoriteBorderIcon,
   AccessTime as TimeIcon,
   People as PeopleIcon,
-  Restaurant as RestaurantIcon
+  Restaurant as RestaurantIcon,
+  DragIndicator as DragIndicatorIcon
 } from '@mui/icons-material'
+
+// Import drag-and-drop utilities
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+  rectSortingStrategy
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 // Import fraction utility
 import { decimalToCookingFraction } from './utils/fractionUtils'
@@ -59,6 +81,7 @@ interface Recipe {
   difficulty_level?: string
   instructions?: string
   notes?: string
+  source_url?: string
   tags?: string
   is_favorite?: boolean
   rating?: number
@@ -98,6 +121,7 @@ export default function RecipeManager() {
     difficulty_level: 'medium',
     instructions: '',
     notes: '',
+    source_url: '',
     tags: '',
     is_favorite: false,
     rating: 0,
@@ -125,6 +149,44 @@ export default function RecipeManager() {
   
   // State for image upload
   const [uploadingImages, setUploadingImages] = useState(false)
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  // Handle recipe reordering (drag-and-drop in main grid)
+  const handleRecipeDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (over && active.id !== over.id) {
+      setRecipes((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id)
+        const newIndex = items.findIndex((item) => item.id === over.id)
+        return arrayMove(items, oldIndex, newIndex)
+      })
+    }
+  }
+
+  // Handle ingredient reordering (drag-and-drop in edit dialog)
+  const handleIngredientDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (over && active.id !== over.id) {
+      setRecipeForm((prev) => {
+        const ingredients = prev.ingredients || []
+        const oldIndex = ingredients.findIndex((_, idx) => idx === active.id)
+        const newIndex = ingredients.findIndex((_, idx) => idx === over.id)
+        return {
+          ...prev,
+          ingredients: arrayMove(ingredients, oldIndex, newIndex)
+        }
+      })
+    }
+  }
 
   const parseQuantity = (value: unknown): number => {
     if (typeof value === 'number' && !Number.isNaN(value)) return value
@@ -603,6 +665,242 @@ export default function RecipeManager() {
     
     return matchesSearch
   })
+
+  // Sortable Recipe Card Component
+  function SortableRecipeCard({ recipe }: { recipe: Recipe }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging
+    } = useSortable({ id: recipe.id! })
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+      cursor: isDragging ? 'grabbing' : 'grab'
+    }
+
+    return (
+      <Card 
+        ref={setNodeRef}
+        style={style}
+        sx={{ 
+          height: '100%', 
+          display: 'flex', 
+          flexDirection: 'column',
+          transition: 'transform 0.2s, box-shadow 0.2s',
+          '&:hover': {
+            boxShadow: 4
+          }
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', p: 1, borderBottom: '1px solid #e0e0e0' }}>
+          <Box {...attributes} {...listeners} sx={{ cursor: 'grab', display: 'flex', alignItems: 'center', mr: 1 }}>
+            <DragIndicatorIcon color="action" />
+          </Box>
+          <Typography variant="body2" color="text.secondary">
+            Drag to reorder
+          </Typography>
+        </Box>
+
+        <Box onClick={() => viewRecipe(recipe)} sx={{ cursor: 'pointer', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          {/* Recipe Image */}
+          {recipe.images && recipe.images.length > 0 && (
+            <Box
+              sx={{
+                width: '100%',
+                height: 200,
+                backgroundColor: '#f5f5f5',
+                overflow: 'hidden'
+              }}
+            >
+              <img
+                src={recipe.images[0]}
+                alt={recipe.title}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover'
+                }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none'
+                }}
+              />
+            </Box>
+          )}
+          
+          <CardContent sx={{ flexGrow: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
+              <Typography variant="h6" component="h3" sx={{ flexGrow: 1 }}>
+                {recipe.title}
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleFavorite(recipe)
+                }}
+                color="secondary"
+              >
+                {recipe.is_favorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}
+              </IconButton>
+            </Box>
+            
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {recipe.description}
+            </Typography>
+            
+            <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+              {recipe.cuisine_type && (
+                <Chip size="small" label={recipe.cuisine_type} />
+              )}
+              {recipe.meal_type && (
+                <Chip size="small" label={recipe.meal_type} variant="outlined" />
+              )}
+              {recipe.difficulty_level && (
+                <Chip
+                  size="small"
+                  label={recipe.difficulty_level}
+                  color={
+                    recipe.difficulty_level === 'easy' ? 'success' :
+                    recipe.difficulty_level === 'hard' ? 'error' : 'warning'
+                  }
+                />
+              )}
+            </Box>
+            
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <TimeIcon fontSize="small" color="action" />
+                <Typography variant="body2">
+                  {recipe.total_time_minutes || ((recipe.prep_time_minutes || 0) + (recipe.cook_time_minutes || 0))}m
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <PeopleIcon fontSize="small" color="action" />
+                <Typography variant="body2">{recipe.servings}</Typography>
+              </Box>
+            </Box>
+          </CardContent>
+        </Box>
+        
+        <CardActions sx={{ justifyContent: 'space-between', p: 2 }}>
+          <Box>
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation()
+                openRecipeDialog(recipe)
+              }}
+            >
+              <EditIcon />
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation()
+                deleteRecipe(recipe.id!)
+              }}
+              color="error"
+            >
+              <DeleteIcon />
+            </IconButton>
+          </Box>
+        </CardActions>
+      </Card>
+    )
+  }
+
+  // Sortable Ingredient Item Component
+  function SortableIngredient({ ingredient, index }: { ingredient: Ingredient; index: number }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging
+    } = useSortable({ id: index })
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1
+    }
+
+    if (editingIngredientIndex === index) {
+      return (
+        <Box ref={setNodeRef} style={style} sx={{ mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 1, backgroundColor: '#f5f5f5' }}>
+          <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+            <Box {...attributes} {...listeners} sx={{ cursor: 'grab' }}>
+              <DragIndicatorIcon color="action" />
+            </Box>
+            <TextField
+              label="Ingredient"
+              value={ingredient.ingredient_name}
+              onChange={(e) => updateIngredient(index, 'ingredient_name', e.target.value)}
+              size="small"
+              fullWidth
+            />
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <TextField
+              label="Quantity"
+              type="number"
+              value={ingredient.quantity}
+              onChange={(e) => updateIngredient(index, 'quantity', parseFloat(e.target.value))}
+              size="small"
+              sx={{ width: 100 }}
+            />
+            <TextField
+              label="Unit"
+              value={ingredient.unit}
+              onChange={(e) => updateIngredient(index, 'unit', e.target.value)}
+              size="small"
+              sx={{ width: 120 }}
+            />
+            <TextField
+              label="Notes"
+              value={ingredient.notes || ''}
+              onChange={(e) => updateIngredient(index, 'notes', e.target.value)}
+              size="small"
+              fullWidth
+            />
+          </Box>
+          <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+            <Button size="small" onClick={() => stopEditingIngredient()} variant="outlined">
+              Done
+            </Button>
+            <IconButton size="small" color="error" onClick={() => removeIngredient(index)}>
+              <DeleteIcon />
+            </IconButton>
+          </Box>
+        </Box>
+      )
+    }
+
+    return (
+      <Box ref={setNodeRef} style={style} sx={{ display: 'flex', alignItems: 'center', mb: 1, p: 1, border: '1px solid #e0e0e0', borderRadius: 1, '&:hover': { backgroundColor: '#f5f5f5' } }}>
+        <Box {...attributes} {...listeners} sx={{ cursor: 'grab', mr: 1 }}>
+          <DragIndicatorIcon color="action" />
+        </Box>
+        <Typography sx={{ flex: 1 }}>
+          <strong>{decimalToCookingFraction(ingredient.quantity)} {ingredient.unit}</strong> {ingredient.ingredient_name}
+          {ingredient.notes && ` (${ingredient.notes})`}
+        </Typography>
+        <IconButton size="small" onClick={() => startEditingIngredient(index)}>
+          <EditIcon fontSize="small" />
+        </IconButton>
+        <IconButton size="small" color="error" onClick={() => removeIngredient(index)}>
+          <DeleteIcon fontSize="small" />
+        </IconButton>
+      </Box>
+    )
+  }
   
   return (
     <Box sx={{ p: 3 }}>
@@ -676,124 +974,27 @@ export default function RecipeManager() {
         {loading ? 'Loading...' : `Found ${filteredRecipes.length} recipe${filteredRecipes.length !== 1 ? 's' : ''}`}
       </Typography>
       
-      {/* Recipe Grid */}
-      <Box sx={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
-        gap: 3 
-      }}>
-        {filteredRecipes.map((recipe) => (
-          <Card 
-            key={recipe.id}
-            onClick={() => viewRecipe(recipe)}
-            sx={{ 
-              height: '100%', 
-              display: 'flex', 
-              flexDirection: 'column',
-              cursor: 'pointer',
-              transition: 'transform 0.2s, box-shadow 0.2s',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: 4
-              }
-            }}
-          >
-            {/* Recipe Image */}
-            {recipe.images && recipe.images.length > 0 && (
-              <Box
-                sx={{
-                  width: '100%',
-                  height: 200,
-                  backgroundColor: '#f5f5f5',
-                  overflow: 'hidden'
-                }}
-              >
-                <img
-                  src={recipe.images[0]}
-                  alt={recipe.title}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover'
-                  }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none'
-                  }}
-                />
-              </Box>
-            )}
-            
-            <CardContent sx={{ flexGrow: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
-                <Typography variant="h6" component="h3" sx={{ flexGrow: 1 }}>
-                  {recipe.title}
-                </Typography>
-                <IconButton
-                  size="small"
-                  onClick={() => toggleFavorite(recipe)}
-                  color="secondary"
-                >
-                  {recipe.is_favorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}
-                </IconButton>
-              </Box>
-              
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                {recipe.description}
-              </Typography>
-              
-              <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                {recipe.cuisine_type && (
-                  <Chip size="small" label={recipe.cuisine_type} />
-                )}
-                {recipe.meal_type && (
-                  <Chip size="small" label={recipe.meal_type} variant="outlined" />
-                )}
-                {recipe.difficulty_level && (
-                  <Chip
-                    size="small"
-                    label={recipe.difficulty_level}
-                    color={
-                      recipe.difficulty_level === 'easy' ? 'success' :
-                      recipe.difficulty_level === 'hard' ? 'error' : 'warning'
-                    }
-                  />
-                )}
-              </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <TimeIcon fontSize="small" color="action" />
-                  <Typography variant="body2">
-                    {recipe.total_time_minutes || ((recipe.prep_time_minutes || 0) + (recipe.cook_time_minutes || 0))}m
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <PeopleIcon fontSize="small" color="action" />
-                  <Typography variant="body2">{recipe.servings}</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-            
-            <CardActions sx={{ justifyContent: 'space-between', p: 2 }}>
-              <Box>
-                <IconButton
-                  size="small"
-                  onClick={() => openRecipeDialog(recipe)}
-                >
-                  <EditIcon />
-                </IconButton>
-                <IconButton
-                  size="small"
-                  onClick={() => deleteRecipe(recipe.id!)}
-                  color="error"
-                >
-                  <DeleteIcon />
-                </IconButton>
-              </Box>
-            </CardActions>
-          </Card>
-        ))}
-      </Box>
+      {/* Recipe Grid with Drag and Drop */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleRecipeDragEnd}
+      >
+        <SortableContext
+          items={filteredRecipes.map(r => r.id!)}
+          strategy={rectSortingStrategy}
+        >
+          <Box sx={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
+            gap: 3 
+          }}>
+            {filteredRecipes.map((recipe) => (
+              <SortableRecipeCard key={recipe.id} recipe={recipe} />
+            ))}
+          </Box>
+        </SortableContext>
+      </DndContext>
       
       {/* Add Recipe FAB */}
       <Fab
@@ -835,6 +1036,14 @@ export default function RecipeManager() {
               onChange={(e) => setRecipeForm({ ...recipeForm, description: e.target.value })}
               multiline
               rows={2}
+            />
+            <TextField
+              fullWidth
+              label="Source URL (optional)"
+              value={recipeForm.source_url}
+              onChange={(e) => setRecipeForm({ ...recipeForm, source_url: e.target.value })}
+              placeholder="https://example.com/recipe"
+              helperText="Add the web URL where you found this recipe"
             />
             <Box sx={{ display: 'flex', gap: 2 }}>
               <TextField
@@ -908,92 +1117,26 @@ export default function RecipeManager() {
                 </Box>
               </Box>
               
-              {/* Ingredients List */}
+              {/* Ingredients List with Drag and Drop */}
               {recipeForm.ingredients && recipeForm.ingredients.length > 0 && (
                 <Box>
                   <Typography variant="subtitle2" gutterBottom>
-                    Recipe Ingredients ({recipeForm.ingredients.length})
+                    Recipe Ingredients ({recipeForm.ingredients.length}) - Drag to reorder
                   </Typography>
-                  {recipeForm.ingredients.map((ingredient, index) => (
-                    <Box 
-                      key={index} 
-                      sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 1,
-                        p: 1, 
-                        border: '1px solid #f0f0f0', 
-                        borderRadius: 1, 
-                        mb: 1,
-                        backgroundColor: editingIngredientIndex === index ? '#e3f2fd' : '#fafafa'
-                      }}
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleIngredientDragEnd}
+                  >
+                    <SortableContext
+                      items={recipeForm.ingredients.map((_, idx) => idx)}
+                      strategy={verticalListSortingStrategy}
                     >
-                      {editingIngredientIndex === index ? (
-                        <>
-                          <TextField
-                            size="small"
-                            type="number"
-                            value={ingredient.quantity}
-                            onChange={(e) => updateIngredient(index, 'quantity', parseFloat(e.target.value) || 0)}
-                            sx={{ width: '80px' }}
-                            inputProps={{ step: 0.25, min: 0 }}
-                          />
-                          <TextField
-                            size="small"
-                            value={ingredient.unit}
-                            onChange={(e) => updateIngredient(index, 'unit', e.target.value)}
-                            sx={{ width: '80px' }}
-                            placeholder="unit"
-                          />
-                          <TextField
-                            size="small"
-                            value={ingredient.ingredient_name}
-                            onChange={(e) => updateIngredient(index, 'ingredient_name', e.target.value)}
-                            sx={{ flex: 1 }}
-                            placeholder="ingredient name"
-                          />
-                          <TextField
-                            size="small"
-                            value={ingredient.notes || ''}
-                            onChange={(e) => updateIngredient(index, 'notes', e.target.value)}
-                            sx={{ flex: 1 }}
-                            placeholder="notes"
-                          />
-                          <IconButton 
-                            size="small" 
-                            onClick={stopEditingIngredient}
-                            color="primary"
-                            title="Done editing"
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </>
-                      ) : (
-                        <>
-                          <Typography variant="body2" sx={{ flex: 1 }}>
-                            <strong>{decimalToCookingFraction(ingredient.quantity)} {ingredient.unit}</strong> {ingredient.ingredient_name}
-                            {ingredient.notes && ` (${ingredient.notes})`}
-                          </Typography>
-                          <IconButton 
-                            size="small" 
-                            onClick={() => startEditingIngredient(index)}
-                            color="primary"
-                            title="Edit ingredient"
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton 
-                            size="small" 
-                            onClick={() => removeIngredient(index)}
-                            color="error"
-                            title="Delete ingredient"
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </>
-                      )}
-                    </Box>
-                  ))}
+                      {recipeForm.ingredients.map((ingredient, index) => (
+                        <SortableIngredient key={index} ingredient={ingredient} index={index} />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
                 </Box>
               )}
             </Box>
@@ -1207,6 +1350,28 @@ export default function RecipeManager() {
                   />
                 )}
               </Box>
+
+              {/* Source URL */}
+              {selectedRecipe.source_url && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Recipe Source:
+                  </Typography>
+                  <Link 
+                    href={selectedRecipe.source_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    sx={{ 
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      fontSize: '0.95rem'
+                    }}
+                  >
+                    {selectedRecipe.source_url}
+                  </Link>
+                </Box>
+              )}
 
               {/* Description */}
               {selectedRecipe.description && (
