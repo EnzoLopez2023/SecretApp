@@ -21,7 +21,11 @@ import {
   Snackbar,
   CircularProgress,
   Fab,
-  Link
+  Link,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel
 } from '@mui/material'
 
 import {
@@ -33,7 +37,8 @@ import {
   AccessTime as TimeIcon,
   People as PeopleIcon,
   Restaurant as RestaurantIcon,
-  DragIndicator as DragIndicatorIcon
+  DragIndicator as DragIndicatorIcon,
+  FilterList as FilterListIcon
 } from '@mui/icons-material'
 
 // Import drag-and-drop utilities
@@ -103,6 +108,9 @@ export default function RecipeManager() {
   
   // State for search
   const [searchTerm, setSearchTerm] = useState('')
+  
+  // State for meal type filter
+  const [mealTypeFilter, setMealTypeFilter] = useState<string>('all')
   
   // State for UI
   const [loading, setLoading] = useState(false)
@@ -214,7 +222,7 @@ export default function RecipeManager() {
     return Number.isNaN(parsed) ? 0 : parsed
   }
 
-  const handleExtractedRecipe = (extractedRecipe: any, successMessage: string) => {
+  const handleExtractedRecipe = (extractedRecipe: any, successMessage: string, sourceUrl?: string) => {
     if (!extractedRecipe) {
       throw new Error('No recipe data returned')
     }
@@ -245,6 +253,7 @@ export default function RecipeManager() {
       difficulty_level: extractedRecipe.difficulty_level || 'medium',
       instructions,
       notes: extractedRecipe.notes || '',
+      source_url: sourceUrl || extractedRecipe.source_url || '',
       tags: extractedRecipe.tags || '',
       is_favorite: false,
       rating: 0,
@@ -562,9 +571,12 @@ export default function RecipeManager() {
       
       // Close import dialog and open recipe dialog with extracted data
       setIsImportDialogOpen(false)
+      
+      // Store the URL before clearing it
+      const recipeUrl = importUrl
       setImportUrl('')
 
-      handleExtractedRecipe(extractedRecipe, 'Recipe extracted successfully! Review and save.')
+      handleExtractedRecipe(extractedRecipe, 'Recipe extracted successfully! Review and save.', recipeUrl)
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error'
       // Add helpful tip for URL import failures
@@ -656,14 +668,16 @@ export default function RecipeManager() {
     }
   }
   
-  // Filter recipes based on search
+  // Filter recipes based on search and meal type
   const filteredRecipes = recipes.filter(recipe => {
     const matchesSearch = searchTerm === '' || 
       recipe.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       recipe.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       recipe.tags?.toLowerCase().includes(searchTerm.toLowerCase())
     
-    return matchesSearch
+    const matchesMealType = mealTypeFilter === 'all' || recipe.meal_type === mealTypeFilter
+    
+    return matchesSearch && matchesMealType
   })
 
   // Sortable Recipe Card Component
@@ -969,10 +983,34 @@ export default function RecipeManager() {
         </Button>
       </Box>
       
-      {/* Recipe Results Count */}
-      <Typography variant="h6" sx={{ mb: 2 }}>
-        {loading ? 'Loading...' : `Found ${filteredRecipes.length} recipe${filteredRecipes.length !== 1 ? 's' : ''}`}
-      </Typography>
+      {/* Recipe Results Count and Filter */}
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 2, flexWrap: 'wrap' }}>
+        <Typography variant="h6">
+          {loading ? 'Loading...' : `Found ${filteredRecipes.length} recipe${filteredRecipes.length !== 1 ? 's' : ''}`}
+        </Typography>
+        
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <FilterListIcon color="action" />
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel id="meal-type-filter-label">Filter by Meal Type</InputLabel>
+            <Select
+              labelId="meal-type-filter-label"
+              id="meal-type-filter"
+              value={mealTypeFilter}
+              label="Filter by Meal Type"
+              onChange={(e) => setMealTypeFilter(e.target.value)}
+            >
+              <MenuItem value="all">All Meal Types</MenuItem>
+              <MenuItem value="breakfast">Breakfast</MenuItem>
+              <MenuItem value="lunch">Lunch</MenuItem>
+              <MenuItem value="dinner">Dinner</MenuItem>
+              <MenuItem value="snack">Snack</MenuItem>
+              <MenuItem value="dessert">Dessert</MenuItem>
+              <MenuItem value="appetizer">Appetizer</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+      </Box>
       
       {/* Recipe Grid with Drag and Drop */}
       <DndContext
@@ -1045,6 +1083,43 @@ export default function RecipeManager() {
               placeholder="https://example.com/recipe"
               helperText="Add the web URL where you found this recipe"
             />
+            
+            {/* Meal Type and Metadata Row */}
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <FormControl sx={{ flex: 1 }}>
+                <InputLabel id="meal-type-label">Meal Type</InputLabel>
+                <Select
+                  labelId="meal-type-label"
+                  id="meal-type-select"
+                  value={recipeForm.meal_type || 'dinner'}
+                  label="Meal Type"
+                  onChange={(e) => setRecipeForm({ ...recipeForm, meal_type: e.target.value })}
+                >
+                  <MenuItem value="breakfast">Breakfast</MenuItem>
+                  <MenuItem value="lunch">Lunch</MenuItem>
+                  <MenuItem value="dinner">Dinner</MenuItem>
+                  <MenuItem value="snack">Snack</MenuItem>
+                  <MenuItem value="dessert">Dessert</MenuItem>
+                  <MenuItem value="appetizer">Appetizer</MenuItem>
+                </Select>
+              </FormControl>
+              
+              <FormControl sx={{ flex: 1 }}>
+                <InputLabel id="difficulty-label">Difficulty</InputLabel>
+                <Select
+                  labelId="difficulty-label"
+                  id="difficulty-select"
+                  value={recipeForm.difficulty_level || 'medium'}
+                  label="Difficulty"
+                  onChange={(e) => setRecipeForm({ ...recipeForm, difficulty_level: e.target.value })}
+                >
+                  <MenuItem value="easy">Easy</MenuItem>
+                  <MenuItem value="medium">Medium</MenuItem>
+                  <MenuItem value="hard">Hard</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+            
             <Box sx={{ display: 'flex', gap: 2 }}>
               <TextField
                 label="Prep Time (minutes)"

@@ -3040,6 +3040,7 @@ app.post('/api/recipes/extract-from-url', async (req, res) => {
           "servings": number or 4,
           "difficulty_level": "easy/medium/hard",
           "instructions": "step by step instructions",
+          "notes": "any special notes, tips, substitutions, or variations mentioned in the recipe",
           "ingredients": [
             {
               "ingredient_name": "name",
@@ -3058,8 +3059,9 @@ app.post('/api/recipes/extract-from-url', async (req, res) => {
         4. Find instruction steps (numbered lists, step-by-step sections)
         5. Look for recipe metadata (prep time, cook time, servings)
         6. Check for recipe titles in h1, h2, or recipe-specific headings
+        7. **IMPORTANT: Look for NOTES sections** - Search for sections labeled "Notes", "Tips", "Recipe Notes", "Baker's Notes", "Chef's Notes", "Cook's Notes", or similar headings. Extract ALL content from these sections into the notes field.
         
-  IMPORTANT: Many recipe websites use structured data or specific HTML patterns. Be thorough in your search regardless of cuisine or dessert type. Focus only on the ingredients, instructions, and metadata that actually appear in the supplied HTML. Do not infer or substitute content from other recipes. Return ONLY the JSON object, no additional text. Only return {"error": "No recipe found"} if you absolutely cannot find any recipe content after exhaustive searching.`
+  IMPORTANT: Many recipe websites use structured data or specific HTML patterns. Be thorough in your search regardless of cuisine or dessert type. Focus only on the ingredients, instructions, and metadata that actually appear in the supplied HTML. Do not infer or substitute content from other recipes. **Pay special attention to any notes, tips, or special instructions sections.** Return ONLY the JSON object, no additional text. Only return {"error": "No recipe found"} if you absolutely cannot find any recipe content after exhaustive searching.`
       },
       {
         role: 'user',
@@ -3068,6 +3070,7 @@ app.post('/api/recipes/extract-from-url', async (req, res) => {
         - Recipe schema markup
         - Ingredient lists and instruction steps
         - Recipe metadata (times, servings, etc.)
+        - **NOTES SECTIONS**: Look for any sections with headings like "Notes", "Tips", "Recipe Notes", "Baker's Notes", "Chef's Notes", or similar. Extract the complete text from these sections into the "notes" field.
         
         ${structuredData}
         
@@ -3198,11 +3201,15 @@ app.post('/api/recipes/extract-from-text', async (req, res) => {
   "tags": "comma-separated tags"
 }
 
-Always respond with ONLY the JSON object. Do not invent ingredients or steps that are not in the text. If quantities are given as fractions, convert them to decimal numbers with up to two decimal places. Extract any notes, tips, or special instructions into the "notes" field.`
+Always respond with ONLY the JSON object. Do not invent ingredients or steps that are not in the text. If quantities are given as fractions, convert them to decimal numbers with up to two decimal places. 
+
+**IMPORTANT FOR NOTES**: Look for sections labeled "Notes", "Tips", "Recipe Notes", "Baker's Notes", "Chef's Notes", "Cook's Notes", or any tips/advice sections. Extract ALL content from these sections into the "notes" field. Notes often contain important baking tips, substitutions, storage advice, or variations.`
       },
       {
         role: 'user',
-        content: `Parse this recipe text into the JSON structure described:
+        content: `Parse this recipe text into the JSON structure described. 
+
+**Special attention**: If the recipe contains a "Notes" section or any tips/advice, make sure to extract that content completely into the "notes" field.
 
 ${recipeText.trim()}`
       }
@@ -3300,6 +3307,7 @@ ${recipeText.trim()}`
         servings: typeof extracted.servings === 'number' ? extracted.servings : 4,
         difficulty_level: extracted.difficulty_level || 'medium',
         instructions: normalizedInstructions,
+        notes: extracted.notes || '',
         tags: extracted.tags || '',
         ingredients: normalizedIngredients
       }

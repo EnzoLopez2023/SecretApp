@@ -19,10 +19,14 @@ SecretApp is a modern, full-stack web application that combines intelligent AI a
 ## � Recent Updates (November 2025)
 
 ### Recipe Manager - Complete Feature Set
-- ✅ **AI-Powered Recipe Import**: Extract recipes from plain text using Azure OpenAI GPT-5
+- ✅ **AI-Powered Recipe Import**: Extract recipes from websites and plain text using Azure OpenAI GPT-5
+- ✅ **Source URL Auto-Fill**: Automatically populates source URL when importing from website
+- ✅ **Enhanced Notes Extraction**: AI now extracts recipe notes, tips, and variations from websites
+- ✅ **Meal Type Filtering**: Filter recipes by category (Breakfast, Lunch, Dinner, Snack, Dessert, Appetizer)
+- ✅ **Editable Meal Types**: Easy dropdown selection for meal type and difficulty when adding/editing recipes
 - ✅ **Image Upload System**: Upload recipe images directly (BLOB storage) or add by URL
 - ✅ **Multiple Images**: Support for unlimited images per recipe with smart display
-- ✅ **Recipe Notes**: Special tips, substitutions, and variations field
+- ✅ **Recipe Notes**: Special tips, substitutions, and variations field with proper extraction
 - ✅ **Smart Ingredient Parsing**: Automatic fraction conversion and format normalization
 - ✅ **Advanced Search**: Filter by cuisine, meal type, difficulty, ingredients, favorites
 - ✅ **Inline Editing**: Edit ingredients directly in the list without modal forms
@@ -74,10 +78,14 @@ SecretApp is a modern, full-stack web application that combines intelligent AI a
 - **Advanced Date Validation**: Smart date handling with clear error messages
 
 ### 🍳 Recipe Manager (NEW)
-- **AI-Powered Recipe Import**: Extract recipes from text with Azure OpenAI
+- **AI-Powered Recipe Import**: Extract recipes from websites or plain text with Azure OpenAI
+- **Source URL Tracking**: Automatically captures and stores recipe source URLs
+- **Enhanced Notes Extraction**: AI intelligently extracts cooking tips, variations, and baker's notes
+- **Meal Type Filtering**: Quick filter by Breakfast, Lunch, Dinner, Snack, Dessert, or Appetizer
+- **Editable Categories**: Easy-to-use dropdowns for meal type and difficulty level
 - **Smart Ingredient Parsing**: Convert fractions, handle mixed formats automatically
 - **Multiple Image Support**: Upload images directly or add by URL
-- **Recipe Notes**: Special tips, substitutions, and variations
+- **Recipe Notes**: Special tips, substitutions, and variations with proper AI extraction
 - **Advanced Search**: Filter by cuisine, meal type, difficulty, ingredients
 - **Favorites & Ratings**: Mark favorites and rate your recipes
 - **Image Display**: First image on cards, full gallery in detail view
