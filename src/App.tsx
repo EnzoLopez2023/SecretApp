@@ -53,6 +53,7 @@ const HomeMaintenanceTracker = lazy(() => import('./HomeMaintenanceTracker'))  /
 const RecipeManager = lazy(() => import('./RecipeManager'))           // Smart recipe management system
 const PantryManagerSimple = lazy(() => import('./PantryManagerSimple'))   // Pantry inventory management system
 const ShoppingListManager = lazy(() => import('./ShoppingListManager'))   // Shopping list management system
+const CuttingBoardDesigner = lazy(() => import('./CuttingBoardDesigner')) // Cutting board design tool (TESTING)
 
 // Import CSS styles
 import './App.css'
@@ -66,7 +67,7 @@ import './App.css'
  * EXAMPLE: If you try to set currentView to 'chatt' (typo), TypeScript will error
  * before you even run the code!
  */
-type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter' | 'plex-api' | 'playlist-creator' | 'home-maintenance' | 'recipe-manager' | 'pantry-manager' | 'shopping-lists'
+type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter' | 'plex-api' | 'playlist-creator' | 'home-maintenance' | 'recipe-manager' | 'pantry-manager' | 'shopping-lists' | 'cutting-board-designer'
 
 /**
  * Main App Component
@@ -192,6 +193,9 @@ export default function App() {
               )}
               {currentView === 'shopping-lists' && (
                 <ShoppingListManager />
+              )}
+              {currentView === 'cutting-board-designer' && (
+                <CuttingBoardDesigner />
               )}
             </Suspense>
           </Box>

@@ -38,13 +38,14 @@ import {
   Build as WorkshopIcon,
   SmartToy as AIIcon,
   Storage as DataIcon,
+  Dashboard as BoardIcon,
 } from '@mui/icons-material';
 import { useMsal } from '@azure/msal-react';
 
 const drawerWidth = 280;
 const collapsedDrawerWidth = 72;
 
-type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter' | 'plex-api' | 'playlist-creator' | 'home-maintenance' | 'recipe-manager' | 'pantry-manager' | 'shopping-lists';
+type AppView = 'dashboard' | 'chat' | 'shop' | 'halloween' | 'woodworking' | 'converter' | 'plex-api' | 'playlist-creator' | 'home-maintenance' | 'recipe-manager' | 'pantry-manager' | 'shopping-lists' | 'cutting-board-designer';
 
 interface NavigationSidebarProps {
   currentView: AppView;
@@ -140,6 +141,7 @@ export default function NavigationSidebar({ currentView, onNavigate, showOnDashb
       items: [
         { id: 'shop', label: 'Shop Tools Manager', icon: <StoreIcon />, color: '#6366f1' },
         { id: 'woodworking', label: 'Project Workshop', icon: <CarpenterIcon />, color: '#f59e0b' },
+        { id: 'cutting-board-designer', label: 'Cutting Board Designer', icon: <BoardIcon />, color: '#6B4423' },
         { id: 'halloween', label: 'Media Library', icon: <MovieIcon />, color: '#ff9800' },
       ]
     },

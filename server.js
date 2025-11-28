@@ -3972,6 +3972,196 @@ Respond with just the title, no quotes or additional text.`
   }
 })
 
+// ============================================================================
+// CUTTING BOARD DESIGN ENDPOINTS
+// ============================================================================
+
+// Save a cutting board design
+app.post('/api/cutting-board-designs', async (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      wood_pieces,
+      design_options,
+      flip_alternating_rows,
+      stagger_alternating_rows,
+      project_notes,
+      custom_colors,
+      end_grain_segment_width,
+      juice_groove,
+      handle_holes
+    } = req.body
+
+    if (!name || !wood_pieces || !design_options) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: name, wood_pieces, and design_options are required' 
+      })
+    }
+
+    const query = `
+      INSERT INTO cutting_board_designs 
+      (name, description, wood_pieces, design_options, flip_alternating_rows, 
+       stagger_alternating_rows, project_notes, custom_colors, end_grain_segment_width, juice_groove, handle_holes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `
+
+    const [result] = await pool.query(query, [
+      name,
+      description || null,
+      JSON.stringify(wood_pieces),
+      JSON.stringify(design_options),
+      flip_alternating_rows || false,
+      stagger_alternating_rows || false,
+      project_notes || null,
+      custom_colors ? JSON.stringify(custom_colors) : null,
+      end_grain_segment_width || 2.0,
+      juice_groove ? JSON.stringify(juice_groove) : null,
+      handle_holes ? JSON.stringify(handle_holes) : null
+    ])
+
+    res.json({
+      success: true,
+      id: result.insertId,
+      message: 'Design saved successfully'
+    })
+  } catch (error) {
+    console.error('Error saving cutting board design:', error)
+    res.status(500).json({ error: 'Failed to save design' })
+  }
+})
+
+// Get all cutting board designs (list view)
+app.get('/api/cutting-board-designs', async (req, res) => {
+  try {
+    const query = `
+      SELECT id, name, description, created_at, updated_at
+      FROM cutting_board_designs
+      ORDER BY updated_at DESC
+    `
+    
+    const [designs] = await pool.query(query)
+    res.json(designs)
+  } catch (error) {
+    console.error('Error fetching cutting board designs:', error)
+    res.status(500).json({ error: 'Failed to fetch designs' })
+  }
+})
+
+// Get a specific cutting board design by ID
+app.get('/api/cutting-board-designs/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    
+    const query = `
+      SELECT * FROM cutting_board_designs WHERE id = ?
+    `
+    
+    const [designs] = await pool.query(query, [id])
+    
+    if (designs.length === 0) {
+      return res.status(404).json({ error: 'Design not found' })
+    }
+
+    const design = designs[0]
+    
+    // Parse JSON fields
+    design.wood_pieces = JSON.parse(design.wood_pieces)
+    design.design_options = JSON.parse(design.design_options)
+    if (design.custom_colors) design.custom_colors = JSON.parse(design.custom_colors)
+    if (design.juice_groove) design.juice_groove = JSON.parse(design.juice_groove)
+    if (design.handle_holes) design.handle_holes = JSON.parse(design.handle_holes)
+    
+    res.json(design)
+  } catch (error) {
+    console.error('Error fetching cutting board design:', error)
+    res.status(500).json({ error: 'Failed to fetch design' })
+  }
+})
+
+// Update a cutting board design
+app.put('/api/cutting-board-designs/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    const {
+      name,
+      description,
+      wood_pieces,
+      design_options,
+      flip_alternating_rows,
+      stagger_alternating_rows,
+      project_notes,
+      custom_colors,
+      end_grain_segment_width,
+      juice_groove,
+      handle_holes
+    } = req.body
+
+    if (!name || !wood_pieces || !design_options) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: name, wood_pieces, and design_options are required' 
+      })
+    }
+
+    const query = `
+      UPDATE cutting_board_designs
+      SET name = ?, description = ?, wood_pieces = ?, design_options = ?,
+          flip_alternating_rows = ?, stagger_alternating_rows = ?, project_notes = ?,
+          custom_colors = ?, end_grain_segment_width = ?, juice_groove = ?, handle_holes = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `
+
+    const [result] = await pool.query(query, [
+      name,
+      description || null,
+      JSON.stringify(wood_pieces),
+      JSON.stringify(design_options),
+      flip_alternating_rows || false,
+      stagger_alternating_rows || false,
+      project_notes || null,
+      custom_colors ? JSON.stringify(custom_colors) : null,
+      end_grain_segment_width || 2.0,
+      juice_groove ? JSON.stringify(juice_groove) : null,
+      handle_holes ? JSON.stringify(handle_holes) : null,
+      id
+    ])
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Design not found' })
+    }
+
+    res.json({
+      success: true,
+      message: 'Design updated successfully'
+    })
+  } catch (error) {
+    console.error('Error updating cutting board design:', error)
+    res.status(500).json({ error: 'Failed to update design' })
+  }
+})
+
+// Delete a cutting board design
+app.delete('/api/cutting-board-designs/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    
+    const query = `DELETE FROM cutting_board_designs WHERE id = ?`
+    const [result] = await pool.query(query, [id])
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Design not found' })
+    }
+
+    res.json({
+      success: true,
+      message: 'Design deleted successfully'
+    })
+  } catch (error) {
+    console.error('Error deleting cutting board design:', error)
+    res.status(500).json({ error: 'Failed to delete design' })
+  }
+})
+
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001
 app.listen(PORT, () => {
   console.log(`🚀 SecretApp Backend Server running on http://localhost:${PORT}`)
@@ -3986,6 +4176,7 @@ app.listen(PORT, () => {
   console.log(`   🎭 Playlist Creator: /api/playlist-creator/*`)
   console.log(`   🏠 Home Maintenance: /api/maintenance/*`)
   console.log(`   🍳 Recipe Manager: /api/recipes/*, /api/pantry/*, /api/shopping-lists/*`)
+  console.log(`   🪵 Cutting Board Designer: /api/cutting-board-designs/*`)
   console.log(``)
   console.log(`🔧 Test endpoints:`)
   console.log(`   📊 Health Check: http://localhost:${PORT}/api/test`)

@@ -1,7 +1,28 @@
-# SecretApp - Comprehensive Workshop & Media Management System
+# SecretApp - Comp## 📢 Recent Updates (November 2025)
+
+### v2.0.0 - Cutting Board Designer (MAJOR RELEASE)
+- ✅ **Professional Cutting Board Designer**: Complete design tool for face grain, edge grain, and end grain boards
+- ✅ **Wood Inventory Management**: Track multiple wood species with thickness, width, length, and quantity
+- ✅ **Smart Pattern Generation**: Respects actual wood quantities for realistic designs
+- ✅ **Dual End Grain Options**: Generate end grain from both face grain AND edge grain glue-ups
+- ✅ **Adjustable Segment Width**: Control end grain strip width (0.5" - 4") to adjust final dimensions
+- ✅ **Accurate Dimension Calculations**: Accounts for kerf loss (1/8" blade width) in all cuts
+- ✅ **2D & 3D Visualizations**: Top-down view and isometric 3D preview with all 6 faces
+- ✅ **Pattern Controls**: Flip and stagger alternating rows for brick-lay patterns
+- ✅ **Pattern Regeneration**: Shuffle patterns while maintaining wood quantities
+- ✅ **Zoom Functionality**: Detailed inspection of designs with 2.5x zoom
+- ✅ **Custom Wood Colors**: Override default colors for personalized visualizations
+- ✅ **Juice Groove Feature**: Add customizable juice grooves with width, depth, and distance controls
+- ✅ **Handle Holes**: Add handle holes with position and diameter controls
+- ✅ **Save/Load Designs**: MySQL database persistence with full project metadata
+- ✅ **Export to PNG**: Download 2D and 3D views as high-quality images (2x scale)
+- ✅ **Side-by-Side Comparison**: Compare up to 3 saved designs simultaneously
+- ✅ **Real-time Calculations**: Instant updates for dimensions, cuts, and waste calculations
+
+### Recipe Manager - Complete Feature Setensive Workshop & Media Management System
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/EnzoLopez2023/SecretApp)
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/EnzoLopez2023/SecretApp/releases)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/EnzoLopez2023/SecretApp/releases)
 [![TypeScript](https://img.shields.io/badge/TypeScript-4.9+-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18+-61DAFB.svg)](https://reactjs.org/)
 [![Material-UI](https://img.shields.io/badge/Material--UI-5+-0081CB.svg)](https://mui.com/)
@@ -10,7 +31,7 @@
 
 > A feature-rich, educational workshop and media management application built with React, TypeScript, and Azure OpenAI. Designed as both a functional application and a comprehensive learning resource for students and developers.
 
-**Latest Release:** v1.3.0 (November 2025) - Recipe Manager with AI Import & Image Upload
+**Latest Release:** v2.0.0 (November 2025) - Cutting Board Designer with Advanced Pattern Generation
 
 ## 🌟 Overview
 
@@ -76,6 +97,24 @@ SecretApp is a modern, full-stack web application that combines intelligent AI a
 - **Material Lists**: Track wood types, hardware, and supplies
 - **Responsive Image Gallery**: Grid-based image display (2/3/4 columns based on screen size)
 - **Advanced Date Validation**: Smart date handling with clear error messages
+
+### 🪵 Cutting Board Designer (NEW - v2.0.0)
+- **Professional Design Tool**: Complete solution for designing face grain, edge grain, and end grain cutting boards
+- **Wood Inventory**: Manage multiple wood species with precise dimensions and quantities
+- **Dual End Grain Options**: Generate end grain boards from both face grain and edge grain glue-ups
+- **Adjustable Segment Width**: Control strip width (0.5" - 4") to customize final board dimensions
+- **Accurate Calculations**: Automatic dimension calculations with kerf loss compensation (1/8" blade)
+- **2D & 3D Visualization**: Top-down and isometric 3D previews showing all six faces
+- **Pattern Controls**: Flip and stagger rows for beautiful brick-lay and checkerboard patterns
+- **Pattern Regeneration**: Shuffle wood arrangements while respecting actual quantities
+- **Custom Colors**: Override default wood colors for personalized visualizations
+- **Juice Groove**: Add customizable juice grooves with width, depth, and positioning controls
+- **Handle Holes**: Design handle holes with diameter and position customization
+- **Database Persistence**: Save and load designs with full project metadata
+- **Export to PNG**: Download high-quality images (2x scale) of 2D and 3D views
+- **Design Comparison**: Compare up to 3 designs side-by-side
+- **Zoom Functionality**: Detailed inspection with 2.5x magnification
+- **Real-time Updates**: Instant recalculation of dimensions, cuts, and material waste
 
 ### 🍳 Recipe Manager (NEW)
 - **AI-Powered Recipe Import**: Extract recipes from websites or plain text with Azure OpenAI
