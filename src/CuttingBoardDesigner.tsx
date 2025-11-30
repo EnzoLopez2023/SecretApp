@@ -32,6 +32,10 @@ import DownloadIcon from '@mui/icons-material/Download';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
+import CalculateIcon from '@mui/icons-material/Calculate';
+import StraightenIcon from '@mui/icons-material/Straighten';
+import FractionCalculator from './FractionCalculator';
+import BoardCalculator from './BoardCalculator';
 
 interface WoodPiece {
   id: string;
@@ -55,6 +59,17 @@ interface DesignOption {
   wasteFromKerf: number;
   pattern: string[];
   id: string; // Unique ID for regenerating individual patterns
+  // Juice Groove settings (per-design)
+  juiceGrooveEnabled: boolean;
+  juiceGrooveWidth: number; // inches
+  juiceGrooveDepth: number; // inches
+  juiceGrooveDistance: number; // inches from edge
+  // Handle Holes settings (per-design)
+  handleHolesEnabled: boolean;
+  handleHoleCount: number;
+  handleHoleDiameter: number; // inches
+  handleHolePositionX: number; // percentage from left
+  handleHolePositionY: number; // percentage from top
 }
 
 const CuttingBoardDesigner: React.FC = () => {
@@ -84,25 +99,30 @@ const CuttingBoardDesigner: React.FC = () => {
   const [savedDesigns, setSavedDesigns] = useState<any[]>([]);
   const [isLoadingDesigns, setIsLoadingDesigns] = useState(false);
 
+  // Calculator dialogs
+  const [fractionCalcOpen, setFractionCalcOpen] = useState(false);
+  const [boardCalcOpen, setBoardCalcOpen] = useState(false);
+
   // Comparison view
   const [compareDialogOpen, setCompareDialogOpen] = useState(false);
   const [selectedForComparison, setSelectedForComparison] = useState<number[]>([]);
 
-  // Juice groove settings
-  const [juiceGrooveEnabled, setJuiceGrooveEnabled] = useState(false);
-  const [juiceGrooveWidth, setJuiceGrooveWidth] = useState(0.5); // inches
-  const [juiceGrooveDepth, setJuiceGrooveDepth] = useState(0.25); // inches
-  const [juiceGrooveDistance, setJuiceGrooveDistance] = useState(0.75); // inches from edge
-
-  // Handle holes settings
-  const [handleHolesEnabled, setHandleHolesEnabled] = useState(false);
-  const [handleHoleCount, setHandleHoleCount] = useState(2);
-  const [handleHoleDiameter, setHandleHoleDiameter] = useState(1.25); // inches
-  const [handleHolePositionX, setHandleHolePositionX] = useState(50); // percentage from left
-  const [handleHolePositionY, setHandleHolePositionY] = useState(50); // percentage from top
-
   // End grain segment width settings
   const [endGrainSegmentWidth, setEndGrainSegmentWidth] = useState(2); // inches - width of cut strips
+
+  // Helper function to update a specific option's juice groove settings
+  const updateOptionJuiceGroove = (optionId: string, updates: Partial<Pick<DesignOption, 'juiceGrooveEnabled' | 'juiceGrooveWidth' | 'juiceGrooveDepth' | 'juiceGrooveDistance'>>) => {
+    setDesignOptions(prev => prev.map(opt => 
+      opt.id === optionId ? { ...opt, ...updates } : opt
+    ));
+  };
+
+  // Helper function to update a specific option's handle holes settings
+  const updateOptionHandleHoles = (optionId: string, updates: Partial<Pick<DesignOption, 'handleHolesEnabled' | 'handleHoleCount' | 'handleHoleDiameter' | 'handleHolePositionX' | 'handleHolePositionY'>>) => {
+    setDesignOptions(prev => prev.map(opt => 
+      opt.id === optionId ? { ...opt, ...updates } : opt
+    ));
+  };
 
   const addWoodPiece = () => {
     const newPiece: WoodPiece = {
@@ -197,7 +217,18 @@ const CuttingBoardDesigner: React.FC = () => {
       description: `Glue pieces along their narrow edges (${avgThickness}" side). The ${avgWidth}" faces create the width. Shows ${faceGrainPattern.length} strips (${totalQuantity} pieces). Wide face pattern.`,
       cuts: 0,
       wasteFromKerf: 0,
-      pattern: faceGrainPattern
+      pattern: faceGrainPattern,
+      // Default juice groove settings
+      juiceGrooveEnabled: false,
+      juiceGrooveWidth: 0.5,
+      juiceGrooveDepth: 0.25,
+      juiceGrooveDistance: 0.75,
+      // Default handle holes settings
+      handleHolesEnabled: false,
+      handleHoleCount: 2,
+      handleHoleDiameter: 1.25,
+      handleHolePositionX: 50,
+      handleHolePositionY: 50
     });
 
     // EDGE GRAIN: Glue along the wide faces (2" faces together)
@@ -217,7 +248,18 @@ const CuttingBoardDesigner: React.FC = () => {
       description: `Glue pieces along their wide faces (${avgWidth}" side). The ${avgThickness}" edges create the width. Shows ${edgeGrainPattern.length} strips (${totalQuantity} pieces). Narrow edge pattern.`,
       cuts: 0,
       wasteFromKerf: 0,
-      pattern: edgeGrainPattern
+      pattern: edgeGrainPattern,
+      // Default juice groove settings
+      juiceGrooveEnabled: false,
+      juiceGrooveWidth: 0.5,
+      juiceGrooveDepth: 0.25,
+      juiceGrooveDistance: 0.75,
+      // Default handle holes settings
+      handleHolesEnabled: false,
+      handleHoleCount: 2,
+      handleHoleDiameter: 1.25,
+      handleHolePositionX: 50,
+      handleHolePositionY: 50
     });
 
     // END GRAIN FROM EDGE GRAIN: Take edge grain board, cut into strips, rotate 90°, and reglue
@@ -265,7 +307,18 @@ const CuttingBoardDesigner: React.FC = () => {
       description: `Take edge grain board, cut into ${segmentWidthEdge}" segments, rotate 90°, and reglue. Narrow strip pattern. Most knife-friendly!`,
       cuts: numberOfCutsEdge,
       wasteFromKerf: totalKerfLossEdge,
-      pattern: generateEndGrainFromEdgePattern()
+      pattern: generateEndGrainFromEdgePattern(),
+      // Default juice groove settings
+      juiceGrooveEnabled: false,
+      juiceGrooveWidth: 0.5,
+      juiceGrooveDepth: 0.25,
+      juiceGrooveDistance: 0.75,
+      // Default handle holes settings
+      handleHolesEnabled: false,
+      handleHoleCount: 2,
+      handleHoleDiameter: 1.25,
+      handleHolePositionX: 50,
+      handleHolePositionY: 50
     });
 
     // END GRAIN FROM FACE GRAIN: Take face grain board, cut into strips, rotate 90°, and reglue
@@ -312,7 +365,18 @@ const CuttingBoardDesigner: React.FC = () => {
       description: `Take face grain board, cut into ${segmentWidthFace}" segments, rotate 90°, and reglue. Wide strip pattern. Most knife-friendly!`,
       cuts: numberOfCutsFace,
       wasteFromKerf: totalKerfLossFace,
-      pattern: generateEndGrainFromFacePattern()
+      pattern: generateEndGrainFromFacePattern(),
+      // Default juice groove settings
+      juiceGrooveEnabled: false,
+      juiceGrooveWidth: 0.5,
+      juiceGrooveDepth: 0.25,
+      juiceGrooveDistance: 0.75,
+      // Default handle holes settings
+      handleHolesEnabled: false,
+      handleHoleCount: 2,
+      handleHoleDiameter: 1.25,
+      handleHolePositionX: 50,
+      handleHolePositionY: 50
     });
 
     setDesignOptions(options);
@@ -431,20 +495,8 @@ const CuttingBoardDesigner: React.FC = () => {
         stagger_alternating_rows: staggerAlternatingRows,
         project_notes: projectNotes || null,
         custom_colors: Object.keys(customColors).length > 0 ? customColors : null,
-        end_grain_segment_width: endGrainSegmentWidth,
-        juice_groove: juiceGrooveEnabled ? {
-          enabled: true,
-          width: juiceGrooveWidth,
-          depth: juiceGrooveDepth,
-          distance_from_edge: juiceGrooveDistance
-        } : null,
-        handle_holes: handleHolesEnabled ? {
-          enabled: true,
-          count: handleHoleCount,
-          diameter: handleHoleDiameter,
-          position_x: handleHolePositionX,
-          position_y: handleHolePositionY
-        } : null
+        end_grain_segment_width: endGrainSegmentWidth
+        // Note: juice_groove and handle_holes are now per-option in design_options
       };
 
       const endpoint = currentDesignId 
@@ -530,26 +582,7 @@ const CuttingBoardDesigner: React.FC = () => {
         setEndGrainSegmentWidth(design.end_grain_segment_width);
       }
       
-      // Restore juice groove settings
-      if (design.juice_groove) {
-        setJuiceGrooveEnabled(true);
-        setJuiceGrooveWidth(design.juice_groove.width || 0.5);
-        setJuiceGrooveDepth(design.juice_groove.depth || 0.25);
-        setJuiceGrooveDistance(design.juice_groove.distance_from_edge || 0.75);
-      } else {
-        setJuiceGrooveEnabled(false);
-      }
-      
-      // Restore handle holes settings
-      if (design.handle_holes) {
-        setHandleHolesEnabled(true);
-        setHandleHoleCount(design.handle_holes.count || 2);
-        setHandleHoleDiameter(design.handle_holes.diameter || 1.25);
-        setHandleHolePositionX(design.handle_holes.position_x || 50);
-        setHandleHolePositionY(design.handle_holes.position_y || 50);
-      } else {
-        setHandleHolesEnabled(false);
-      }
+      // Note: juice_groove and handle_holes are now restored per-option from design_options
       
       setLoadDialogOpen(false);
       setSaveStatus({ type: 'success', message: 'Design loaded successfully!' });
@@ -847,11 +880,23 @@ const CuttingBoardDesigner: React.FC = () => {
     } else {
       // End grain: Brick-lay pattern - alternating rows are offset by half the board thickness
       const totalQuantity = woodPieces.reduce((sum, piece) => sum + piece.quantity, 0);
-      const avgThickness = woodPieces.reduce((sum, piece) => sum + piece.thickness, 0) / woodPieces.length; // Average thickness
-      const numRows = Math.floor(option.dimensions.length / 2); // Number of 2" rows
+      const avgThickness = woodPieces.reduce((sum, piece) => sum + piece.thickness, 0) / woodPieces.length; // Average thickness (0.75")
+      const avgWidth = woodPieces.reduce((sum, piece) => sum + piece.width, 0) / woodPieces.length; // Average width (2")
+      
+      // Determine row height based on which end grain type
+      // From Edge Grain: each row is 2" (avgWidth becomes length after rotation)
+      // From Face Grain: each row is 0.75" (avgThickness becomes length after rotation)
+      const isFromEdgeGrain = option.id === 'end-grain-from-edge';
+      const rowThickness = isFromEdgeGrain ? avgWidth : avgThickness; // 2" or 0.75"
+      const numRows = Math.round(option.dimensions.length / rowThickness); // Actual number of rows
       const rowHeight = (option.dimensions.length / numRows) * scale;
       const pieceWidth = (option.dimensions.width / totalQuantity) * scale; // Width of each piece in pixels
-      const offsetAmount = (avgThickness / 2) * scale; // Half of thickness for stagger offset
+      
+      // Stagger offset should be half of the wood piece width (perpendicular dimension)
+      // From Edge Grain: pieces are avgThickness wide (0.75"), so offset = 0.375"
+      // From Face Grain: pieces are avgWidth wide (2"), so offset = 1"
+      const woodPieceWidth = isFromEdgeGrain ? avgThickness : avgWidth;
+      const offsetAmount = (woodPieceWidth / 2) * scale; // Half of wood piece width for stagger offset
       
       return (
         <Box sx={{ position: 'relative' }}>
@@ -862,8 +907,8 @@ const CuttingBoardDesigner: React.FC = () => {
             </Typography>
           </Box>
           
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            {/* Length label (left side) */}
+          <Box sx={{ display: 'flex', alignItems: 'center', position: 'relative', px: 8 }}>
+            {/* Length label (left side) - positioned to avoid row numbers */}
             <Typography 
               variant="caption" 
               sx={{ 
@@ -871,9 +916,12 @@ const CuttingBoardDesigner: React.FC = () => {
                 bgcolor: 'white', 
                 px: 0.5, 
                 borderRadius: 1,
-                mr: 0.5,
-                writingMode: 'vertical-rl',
-                transform: 'rotate(180deg)'
+                mr: 1,
+                position: 'absolute',
+                left: -5,
+                top: '50%',
+                transform: 'translateY(-50%) rotate(-90deg)',
+                zIndex: 5
               }}
             >
               {option.dimensions.length.toFixed(2)}"L
@@ -885,84 +933,163 @@ const CuttingBoardDesigner: React.FC = () => {
                 width: previewWidth,
                 height: previewLength,
                 border: '2px solid #333',
-                overflow: 'hidden',
+                overflow: 'visible',
                 borderRadius: '4px',
                 boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
                 position: 'relative'
               }}
             >
-              {/* Render each row */}
-              {Array.from({ length: numRows }).map((_, rowIdx) => {
-                const isAlternateRow = rowIdx % 2 === 1;
-                const shouldFlip = flipAlternatingRows && isAlternateRow;
-                const shouldStagger = staggerAlternatingRows && isAlternateRow;
-                
-                // Get pattern - flip if needed
-                let rowPattern = option.pattern.slice(0, totalQuantity);
-                if (shouldFlip) {
-                  rowPattern = [...rowPattern].reverse();
-                }
-                
-                return (
-                  <Box
-                    key={`row-${rowIdx}`}
-                    sx={{
-                      position: 'absolute',
-                      top: rowIdx * rowHeight,
-                      left: shouldStagger ? offsetAmount : 0, // Shift right by half thickness if staggered
-                      width: previewWidth,
-                      height: rowHeight,
-                      display: 'flex',
-                      flexDirection: 'row',
-                      overflow: 'visible'
-                    }}
-                  >
-                    {/* All rows show full pieces - no half pieces */}
-                    {rowPattern.map((wood, idx) => (
-                      <Box
-                        key={idx}
-                        sx={{
-                          width: pieceWidth,
-                          height: '100%',
-                          backgroundColor: getWoodColor(wood),
-                          borderRight: idx < rowPattern.length - 1 ? '2px solid rgba(0,0,0,0.3)' : 'none',
-                          backgroundImage: `
-                            radial-gradient(circle at center, rgba(0,0,0,0.1) 0.5px, transparent 0.5px)
-                          `,
-                          backgroundSize: '3px 3px'
-                        }}
-                      />
-                    ))}
-                  </Box>
-                );
-              })}
-            </Box>
-
-            {/* Juice Groove Overlay */}
-            {juiceGrooveEnabled && (
+              {/* Inner clipping container for wood pieces */}
               <Box
                 sx={{
                   position: 'absolute',
-                  top: juiceGrooveDistance * scale,
-                  left: juiceGrooveDistance * scale,
-                  right: juiceGrooveDistance * scale,
-                  bottom: juiceGrooveDistance * scale,
-                  border: `${juiceGrooveWidth * scale}px solid rgba(101, 67, 33, 0.6)`,
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  overflow: 'hidden',
+                  borderRadius: '4px'
+                }}
+              >
+                {/* Render each row */}
+                {Array.from({ length: numRows }).map((_, rowIdx) => {
+                  const isAlternateRow = rowIdx % 2 === 1;
+                  const shouldFlip = flipAlternatingRows && isAlternateRow;
+                  const shouldStagger = staggerAlternatingRows && isAlternateRow;
+                  
+                  // Get pattern - flip if needed
+                  let rowPattern = option.pattern.slice(0, totalQuantity);
+                  if (shouldFlip) {
+                    rowPattern = [...rowPattern].reverse();
+                  }
+                  
+                  return (
+                    <Box
+                      key={`row-${rowIdx}`}
+                      sx={{
+                        position: 'absolute',
+                        top: rowIdx * rowHeight,
+                        left: shouldStagger ? offsetAmount : 0, // Shift right by half thickness if staggered
+                        width: previewWidth,
+                        height: rowHeight,
+                        display: 'flex',
+                        flexDirection: 'row'
+                      }}
+                    >
+                      {/* All rows show full pieces - no half pieces */}
+                      {rowPattern.map((wood, idx) => (
+                        <Box
+                          key={idx}
+                          sx={{
+                            width: pieceWidth,
+                            height: '100%',
+                            backgroundColor: getWoodColor(wood),
+                            borderRight: idx < rowPattern.length - 1 ? '2px solid rgba(0,0,0,0.3)' : 'none',
+                            backgroundImage: `
+                              radial-gradient(circle at center, rgba(0,0,0,0.1) 0.5px, transparent 0.5px)
+                            `,
+                            backgroundSize: '3px 3px'
+                          }}
+                        />
+                      ))}
+                    </Box>
+                  );
+                })}
+              </Box>
+
+              {/* Row labels and cut lines - rendered outside clipping container */}
+              {Array.from({ length: numRows }).map((_, rowIdx) => (
+                <Box key={`labels-${rowIdx}`}>
+                  {/* Row number label on the left */}
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      left: -30,
+                      top: rowIdx * rowHeight + rowHeight / 2,
+                      transform: 'translateY(-50%)',
+                      bgcolor: 'rgba(255, 255, 255, 0.95)',
+                      border: '1px solid #333',
+                      borderRadius: '4px',
+                      px: 0.5,
+                      py: 0.25,
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      color: '#333',
+                      zIndex: 10,
+                      minWidth: '20px',
+                      textAlign: 'center'
+                    }}
+                  >
+                    {rowIdx + 1}
+                  </Box>
+
+                  {/* Row size label on the right */}
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      right: -55,
+                      top: rowIdx * rowHeight + rowHeight / 2,
+                      transform: 'translateY(-50%)',
+                      bgcolor: 'rgba(255, 255, 255, 0.95)',
+                      border: '1px solid #666',
+                      borderRadius: '4px',
+                      px: 0.5,
+                      py: 0.25,
+                      fontSize: '9px',
+                      fontWeight: 600,
+                      color: '#666',
+                      zIndex: 10,
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {rowThickness.toFixed(2)}"
+                  </Box>
+                </Box>
+              ))}
+              
+              {/* Cut lines - show at actual cut positions (not affected by stagger) */}
+              {Array.from({ length: numRows - 1 }).map((_, cutIdx) => (
+                <Box
+                  key={`cut-line-${cutIdx}`}
+                  sx={{
+                    position: 'absolute',
+                    top: (cutIdx + 1) * rowHeight,
+                    left: 0,
+                    right: 0,
+                    height: '2px',
+                    bgcolor: 'rgba(255, 0, 0, 0.7)',
+                    zIndex: 5,
+                    boxShadow: '0 0 3px rgba(255, 0, 0, 0.8)'
+                  }}
+                />
+              ))}
+            </Box>
+
+            {/* Juice Groove Overlay */}
+            {option.juiceGrooveEnabled && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: option.juiceGrooveDistance * scale,
+                  left: option.juiceGrooveDistance * scale,
+                  right: option.juiceGrooveDistance * scale,
+                  bottom: option.juiceGrooveDistance * scale,
+                  border: `${option.juiceGrooveWidth * scale}px solid rgba(101, 67, 33, 0.6)`,
                   borderRadius: 1,
                   pointerEvents: 'none',
-                  boxShadow: `inset 0 0 ${juiceGrooveDepth * scale * 2}px rgba(0,0,0,0.4)`
+                  boxShadow: `inset 0 0 ${option.juiceGrooveDepth * scale * 2}px rgba(0,0,0,0.4)`
                 }}
               />
             )}
 
             {/* Handle Holes Overlay */}
-            {handleHolesEnabled && (
+            {option.handleHolesEnabled && (
               <>
-                {Array.from({ length: handleHoleCount }).map((_, idx) => {
-                  const spacing = previewWidth / (handleHoleCount + 1);
+                {Array.from({ length: option.handleHoleCount }).map((_, idx) => {
+                  const spacing = previewWidth / (option.handleHoleCount + 1);
                   const xPos = spacing * (idx + 1);
-                  const yPos = (handleHolePositionY / 100) * previewLength;
-                  const radius = (handleHoleDiameter / 2) * scale;
+                  const yPos = (option.handleHolePositionY / 100) * previewLength;
+                  const radius = (option.handleHoleDiameter / 2) * scale;
                   
                   return (
                     <Box
@@ -985,7 +1112,7 @@ const CuttingBoardDesigner: React.FC = () => {
               </>
             )}
 
-            {/* Thickness label (right side) */}
+            {/* Thickness label (right side) - positioned to avoid row size labels */}
             <Typography 
               variant="caption" 
               sx={{ 
@@ -993,8 +1120,11 @@ const CuttingBoardDesigner: React.FC = () => {
                 bgcolor: 'white', 
                 px: 0.5, 
                 borderRadius: 1,
-                ml: 0.5,
-                writingMode: 'vertical-rl'
+                position: 'absolute',
+                right: -65,
+                top: '50%',
+                transform: 'translateY(-50%) rotate(90deg)',
+                zIndex: 5
               }}
             >
               {option.dimensions.thickness.toFixed(3)}"T
@@ -1249,11 +1379,23 @@ const CuttingBoardDesigner: React.FC = () => {
     } else {
       // End grain 3D view - Brick-lay pattern
       const totalQuantity = woodPieces.reduce((sum, piece) => sum + piece.quantity, 0);
-      const avgThickness = woodPieces.reduce((sum, piece) => sum + piece.thickness, 0) / woodPieces.length; // Average thickness
-      const numRows = Math.floor(option.dimensions.length / 2);
+      const avgThickness = woodPieces.reduce((sum, piece) => sum + piece.thickness, 0) / woodPieces.length; // Average thickness (0.75")
+      const avgWidth = woodPieces.reduce((sum, piece) => sum + piece.width, 0) / woodPieces.length; // Average width (2")
+      
+      // Determine row height based on which end grain type (same as 2D view)
+      // From Edge Grain: each row is 2" (avgWidth becomes length after rotation)
+      // From Face Grain: each row is 0.75" (avgThickness becomes length after rotation)
+      const isFromEdgeGrain = option.id === 'end-grain-from-edge';
+      const rowThickness = isFromEdgeGrain ? avgWidth : avgThickness; // 2" or 0.75"
+      const numRows = Math.round(option.dimensions.length / rowThickness); // Actual number of rows
       const rowHeight = baseLength / numRows;
       const pieceWidth = baseWidth / totalQuantity;
-      const offsetAmount = (avgThickness / 2) * scale; // Half of thickness for stagger offset
+      
+      // Stagger offset should be half of the wood piece width (perpendicular dimension)
+      // From Edge Grain: pieces are avgThickness wide (0.75"), so offset = 0.375"
+      // From Face Grain: pieces are avgWidth wide (2"), so offset = 1"
+      const woodPieceWidth = isFromEdgeGrain ? avgThickness : avgWidth;
+      const offsetAmount = (woodPieceWidth / 2) * scale; // Half of wood piece width for stagger offset
       
       return (
         <Box
@@ -1334,6 +1476,24 @@ const CuttingBoardDesigner: React.FC = () => {
                   </Box>
                 );
               })}
+              
+              {/* Cut lines - show at actual cut positions (not affected by stagger) */}
+              {Array.from({ length: numRows - 1 }).map((_, cutIdx) => (
+                <Box
+                  key={`3d-cut-line-${cutIdx}`}
+                  sx={{
+                    position: 'absolute',
+                    top: (cutIdx + 1) * rowHeight,
+                    left: 0,
+                    width: baseWidth,
+                    height: '2px',
+                    bgcolor: 'rgba(255, 0, 0, 0.8)',
+                    zIndex: 10,
+                    boxShadow: '0 0 4px rgba(255, 0, 0, 0.9)',
+                    pointerEvents: 'none'
+                  }}
+                />
+              ))}
             </Box>
 
             {/* Front face (thickness) */}
@@ -1422,6 +1582,30 @@ const CuttingBoardDesigner: React.FC = () => {
         {/* Left Panel - Input */}
         <Grid item xs={12} md={5}>
           <Paper elevation={2} sx={{ p: 3 }}>
+            {/* Calculator Buttons */}
+            <Box sx={{ mb: 3, display: 'flex', gap: 2, justifyContent: 'center' }}>
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={<CalculateIcon />}
+                onClick={() => setFractionCalcOpen(true)}
+                sx={{ flex: 1 }}
+              >
+                Fraction Calculator
+              </Button>
+              <Button
+                variant="outlined"
+                color="secondary"
+                startIcon={<StraightenIcon />}
+                onClick={() => setBoardCalcOpen(true)}
+                sx={{ flex: 1 }}
+              >
+                Board Calculator
+              </Button>
+            </Box>
+
+            <Divider sx={{ mb: 3 }} />
+
             {/* Project Metadata */}
             <Box sx={{ mb: 3 }}>
               <Typography variant="h6" sx={{ mb: 2 }}>Project Details</Typography>
@@ -1571,127 +1755,13 @@ const CuttingBoardDesigner: React.FC = () => {
               ))}
             </Stack>
 
-            {/* Juice Groove Settings */}
-            <Box sx={{ mt: 3, p: 2, bgcolor: 'rgba(33, 150, 243, 0.08)', borderRadius: 2, border: '1px solid rgba(33, 150, 243, 0.3)' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                  🌊 Juice Groove
-                </Typography>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={juiceGrooveEnabled}
-                      onChange={(e) => setJuiceGrooveEnabled(e.target.checked)}
-                      color="primary"
-                    />
-                  }
-                  label={juiceGrooveEnabled ? "Enabled" : "Disabled"}
-                />
-              </Box>
-              
-              {juiceGrooveEnabled && (
-                <Grid container spacing={2}>
-                  <Grid item xs={4}>
-                    <TextField
-                      fullWidth
-                      label='Width (")'
-                      type="number"
-                      value={juiceGrooveWidth}
-                      onChange={(e) => setJuiceGrooveWidth(parseFloat(e.target.value) || 0.5)}
-                      size="small"
-                      inputProps={{ step: 0.125, min: 0.25, max: 1 }}
-                    />
-                  </Grid>
-                  <Grid item xs={4}>
-                    <TextField
-                      fullWidth
-                      label='Depth (")'
-                      type="number"
-                      value={juiceGrooveDepth}
-                      onChange={(e) => setJuiceGrooveDepth(parseFloat(e.target.value) || 0.25)}
-                      size="small"
-                      inputProps={{ step: 0.0625, min: 0.125, max: 0.5 }}
-                    />
-                  </Grid>
-                  <Grid item xs={4}>
-                    <TextField
-                      fullWidth
-                      label='From Edge (")'
-                      type="number"
-                      value={juiceGrooveDistance}
-                      onChange={(e) => setJuiceGrooveDistance(parseFloat(e.target.value) || 0.75)}
-                      size="small"
-                      inputProps={{ step: 0.125, min: 0.5, max: 2 }}
-                    />
-                  </Grid>
-                </Grid>
-              )}
-            </Box>
-
-            {/* Handle Holes Settings */}
-            <Box sx={{ mt: 2, p: 2, bgcolor: 'rgba(156, 39, 176, 0.08)', borderRadius: 2, border: '1px solid rgba(156, 39, 176, 0.3)' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                  🔘 Handle Holes
-                </Typography>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={handleHolesEnabled}
-                      onChange={(e) => setHandleHolesEnabled(e.target.checked)}
-                      color="secondary"
-                    />
-                  }
-                  label={handleHolesEnabled ? "Enabled" : "Disabled"}
-                />
-              </Box>
-              
-              {handleHolesEnabled && (
-                <Grid container spacing={2}>
-                  <Grid item xs={4}>
-                    <TextField
-                      fullWidth
-                      label="Count"
-                      type="number"
-                      value={handleHoleCount}
-                      onChange={(e) => setHandleHoleCount(parseInt(e.target.value) || 2)}
-                      size="small"
-                      inputProps={{ min: 1, max: 4 }}
-                    />
-                  </Grid>
-                  <Grid item xs={4}>
-                    <TextField
-                      fullWidth
-                      label='Diameter (")'
-                      type="number"
-                      value={handleHoleDiameter}
-                      onChange={(e) => setHandleHoleDiameter(parseFloat(e.target.value) || 1.25)}
-                      size="small"
-                      inputProps={{ step: 0.125, min: 0.5, max: 3 }}
-                    />
-                  </Grid>
-                  <Grid item xs={4}>
-                    <TextField
-                      fullWidth
-                      label="Position Y (%)"
-                      type="number"
-                      value={handleHolePositionY}
-                      onChange={(e) => setHandleHolePositionY(parseFloat(e.target.value) || 50)}
-                      size="small"
-                      inputProps={{ min: 10, max: 90 }}
-                    />
-                  </Grid>
-                </Grid>
-              )}
-            </Box>
-
             {/* End Grain Segment Width Control */}
             <Box sx={{ mt: 3, p: 2, bgcolor: 'rgba(107, 68, 35, 0.1)', borderRadius: 2, border: '1px solid rgba(107, 68, 35, 0.3)' }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#6B4423' }}>
                 🪚 End Grain Cut Width
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2 }}>
-                Width of strips when cutting for end grain boards (affects final dimensions)
+                Width of strips when cutting for end grain boards (affects final dimensions) (add .125" for saw blade kerf)
               </Typography>
               <TextField
                 fullWidth
@@ -1874,7 +1944,12 @@ const CuttingBoardDesigner: React.FC = () => {
                                 Stagger Alternating Rows
                               </Typography>
                               <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                Shifts row by half thickness ({woodPieces.length > 0 ? (woodPieces[0].thickness / 2).toFixed(3) : '0.375'}″)
+                                Shifts row by half width (
+                                {woodPieces.length > 0 
+                                  ? (option.id === 'end-grain-from-edge' 
+                                      ? (woodPieces[0].thickness / 2).toFixed(3) // Edge grain: shift by half of 0.75" = 0.375"
+                                      : (woodPieces[0].width / 2).toFixed(3))    // Face grain: shift by half of 2" = 1"
+                                  : '0.375'}″)
                               </Typography>
                             </Box>
                             <Button
@@ -1892,6 +1967,122 @@ const CuttingBoardDesigner: React.FC = () => {
                           </Typography>
                         </Box>
                       )}
+
+                      {/* Juice Groove Settings - Per Design Option */}
+                      <Box sx={{ mt: 2, p: 2, bgcolor: 'rgba(33, 150, 243, 0.08)', borderRadius: 2, border: '1px solid rgba(33, 150, 243, 0.3)' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                            🌊 Juice Groove
+                          </Typography>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                checked={option.juiceGrooveEnabled}
+                                onChange={(e) => updateOptionJuiceGroove(option.id, { juiceGrooveEnabled: e.target.checked })}
+                                color="primary"
+                                size="small"
+                              />
+                            }
+                            label={option.juiceGrooveEnabled ? "On" : "Off"}
+                          />
+                        </Box>
+                        
+                        {option.juiceGrooveEnabled && (
+                          <Grid container spacing={2}>
+                            <Grid item xs={4}>
+                              <TextField
+                                fullWidth
+                                label='Width (")'
+                                type="number"
+                                value={option.juiceGrooveWidth}
+                                onChange={(e) => updateOptionJuiceGroove(option.id, { juiceGrooveWidth: parseFloat(e.target.value) || 0.5 })}
+                                size="small"
+                                inputProps={{ step: 0.125, min: 0.25, max: 1 }}
+                              />
+                            </Grid>
+                            <Grid item xs={4}>
+                              <TextField
+                                fullWidth
+                                label='Depth (")'
+                                type="number"
+                                value={option.juiceGrooveDepth}
+                                onChange={(e) => updateOptionJuiceGroove(option.id, { juiceGrooveDepth: parseFloat(e.target.value) || 0.25 })}
+                                size="small"
+                                inputProps={{ step: 0.0625, min: 0.125, max: 0.5 }}
+                              />
+                            </Grid>
+                            <Grid item xs={4}>
+                              <TextField
+                                fullWidth
+                                label='From Edge (")'
+                                type="number"
+                                value={option.juiceGrooveDistance}
+                                onChange={(e) => updateOptionJuiceGroove(option.id, { juiceGrooveDistance: parseFloat(e.target.value) || 0.75 })}
+                                size="small"
+                                inputProps={{ step: 0.125, min: 0.5, max: 2 }}
+                              />
+                            </Grid>
+                          </Grid>
+                        )}
+                      </Box>
+
+                      {/* Handle Holes Settings - Per Design Option */}
+                      <Box sx={{ mt: 2, p: 2, bgcolor: 'rgba(156, 39, 176, 0.08)', borderRadius: 2, border: '1px solid rgba(156, 39, 176, 0.3)' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                            🔘 Handle Holes
+                          </Typography>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                checked={option.handleHolesEnabled}
+                                onChange={(e) => updateOptionHandleHoles(option.id, { handleHolesEnabled: e.target.checked })}
+                                color="secondary"
+                                size="small"
+                              />
+                            }
+                            label={option.handleHolesEnabled ? "On" : "Off"}
+                          />
+                        </Box>
+                        
+                        {option.handleHolesEnabled && (
+                          <Grid container spacing={2}>
+                            <Grid item xs={4}>
+                              <TextField
+                                fullWidth
+                                label="Count"
+                                type="number"
+                                value={option.handleHoleCount}
+                                onChange={(e) => updateOptionHandleHoles(option.id, { handleHoleCount: parseInt(e.target.value) || 2 })}
+                                size="small"
+                                inputProps={{ min: 1, max: 4 }}
+                              />
+                            </Grid>
+                            <Grid item xs={4}>
+                              <TextField
+                                fullWidth
+                                label='Diameter (")'
+                                type="number"
+                                value={option.handleHoleDiameter}
+                                onChange={(e) => updateOptionHandleHoles(option.id, { handleHoleDiameter: parseFloat(e.target.value) || 1.25 })}
+                                size="small"
+                                inputProps={{ step: 0.125, min: 0.5, max: 3 }}
+                              />
+                            </Grid>
+                            <Grid item xs={4}>
+                              <TextField
+                                fullWidth
+                                label="Position Y (%)"
+                                type="number"
+                                value={option.handleHolePositionY}
+                                onChange={(e) => updateOptionHandleHoles(option.id, { handleHolePositionY: parseFloat(e.target.value) || 50 })}
+                                size="small"
+                                inputProps={{ min: 10, max: 90 }}
+                              />
+                            </Grid>
+                          </Grid>
+                        )}
+                      </Box>
 
                       <Box sx={{ position: 'relative' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
@@ -2224,6 +2415,16 @@ const CuttingBoardDesigner: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Calculator Components */}
+      <FractionCalculator 
+        open={fractionCalcOpen} 
+        onClose={() => setFractionCalcOpen(false)} 
+      />
+      <BoardCalculator 
+        open={boardCalcOpen} 
+        onClose={() => setBoardCalcOpen(false)} 
+      />
     </Box>
   );
 };
