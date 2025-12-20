@@ -3,11 +3,18 @@ import cors from 'cors'
 import mysql from 'mysql2/promise'
 import fetch from 'node-fetch'
 import https from 'https'
+import fs from 'fs/promises'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { convertToStorePackage, getEstimatedPrice } from './utils/storePackageSizes.js'
 
 const app = express()
 app.use(cors())
 app.use(express.json({ limit: '50mb' }))
+
+// Get __dirname equivalent for ES modules
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 // Azure OpenAI configuration (secure backend-only)
 const azureOpenAIConfig = {
@@ -4159,6 +4166,67 @@ app.delete('/api/cutting-board-designs/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting cutting board design:', error)
     res.status(500).json({ error: 'Failed to delete design' })
+  }
+})
+
+// ============================================
+// PDF Files Endpoint
+// ============================================
+
+// Serve PDF files with proper headers
+app.use('/PDFs', express.static(path.join(__dirname, 'PDFs'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.pdf')) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline'); // Display in browser instead of download
+    }
+  }
+}));
+
+// Serve PDF Image files
+app.use('/PDF_Images', express.static(path.join(__dirname, 'PDF_Images')));
+
+// Get list of all PDF files
+app.get('/api/pdf-files', async (req, res) => {
+  try {
+    const pdfDir = path.join(__dirname, 'PDFs')
+    const files = await fs.readdir(pdfDir)
+    
+    // Filter only PDF files and create file objects
+    const pdfFiles = files
+      .filter(file => file.toLowerCase().endsWith('.pdf'))
+      .map(file => ({
+        name: file,
+        path: `/PDFs/${file}`
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+    
+    res.json(pdfFiles)
+  } catch (error) {
+    console.error('Error reading PDF directory:', error)
+    res.status(500).json({ error: 'Failed to load PDF files' })
+  }
+})
+
+// Get list of all converted image files
+app.get('/api/image-files', async (req, res) => {
+  try {
+    const imageDir = path.join(__dirname, 'PDF_Images')
+    const files = await fs.readdir(imageDir)
+    
+    // Filter only JPG files and create file objects
+    const imageFiles = files
+      .filter(file => file.toLowerCase().endsWith('.jpg'))
+      .map(file => ({
+        name: file,
+        path: `/PDF_Images/${file}`
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+    
+    res.json(imageFiles)
+  } catch (error) {
+    console.error('Error reading PDF_Images directory:', error)
+    res.status(500).json({ error: 'Failed to load image files' })
   }
 })
 

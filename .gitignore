@@ -34,3 +34,6 @@ coverage/
 *.njsproj
 *.sln
 *.sw?
+
+# PDFs folder - exclude from git (only keep converted images)
+PDFs/
