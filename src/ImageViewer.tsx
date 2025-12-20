@@ -43,6 +43,10 @@ const ImageViewer: React.FC = () => {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(-1);
   const [zoom, setZoom] = useState(1);
   
+  // Touch/swipe state for mobile
+  const [touchStart, setTouchStart] = useState<number>(0);
+  const [touchEnd, setTouchEnd] = useState<number>(0);
+  
   // Pagination for file list
   const [page, setPage] = useState(1);
   const itemsPerPage = 100;
@@ -77,6 +81,31 @@ const ImageViewer: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedImage, selectedImageIndex, filteredFiles]);
+
+  // Touch/swipe handlers for mobile navigation
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(0); // Reset
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50; // Minimum swipe distance
+    const isRightSwipe = distance < -50;
+    
+    if (isLeftSwipe) {
+      navigateToNextImage(); // Swipe left = next image
+    }
+    if (isRightSwipe) {
+      navigateToPreviousImage(); // Swipe right = previous image
+    }
+  };
 
   useEffect(() => {
     // Filter files based on search term
@@ -376,8 +405,12 @@ const ImageViewer: React.FC = () => {
             bgcolor: '#000',
             overflow: 'auto',
             p: 2,
-            height: 'calc(90vh - 64px)' // Subtract title bar height
+            height: 'calc(90vh - 64px)', // Subtract title bar height
+            touchAction: 'pan-y' // Allow vertical scrolling but enable horizontal swipe
           }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
           {selectedImage && (
             <Box
@@ -394,7 +427,8 @@ const ImageViewer: React.FC = () => {
                 transformOrigin: 'center center',
                 transition: 'transform 0.2s',
                 cursor: zoom > 1 ? 'move' : 'default',
-                display: 'block'
+                display: 'block',
+                userSelect: 'none' // Prevent image selection during swipe
               }}
             />
           )}
