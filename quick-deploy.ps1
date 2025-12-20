@@ -23,6 +23,12 @@ Remove-Item "C:\inetpub\wwwroot\secretapp\*" -Recurse -Force -ErrorAction Silent
 Write-Host "Copying new build..." -ForegroundColor Yellow
 Copy-Item -Path "dist\*" -Destination "C:\inetpub\wwwroot\secretapp\" -Recurse -Force
 
+# Copy PDF Images folder
+Write-Host "Copying PDF Images..." -ForegroundColor Yellow
+if (Test-Path "PDF_Images") {
+    Copy-Item -Path "PDF_Images" -Destination "C:\inetpub\wwwroot\secretapp\" -Recurse -Force
+}
+
 # Copy server files if they don't exist
 if (-not (Test-Path "C:\inetpub\wwwroot\secretapp\package.json")) {
     Write-Host "Copying server files (package.json, server.js, ecosystem.config.cjs)..." -ForegroundColor Yellow

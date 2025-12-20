@@ -27,6 +27,10 @@ Write-Host "Copying build artifacts to IIS site" -ForegroundColor Yellow
 xcopy /E /Y "C:\Source\Repo\SecretApp\dist\*" "C:\inetpub\wwwroot\secretapp\" | Out-Null
 xcopy /E /Y "C:\Source\Repo\SecretApp\utils" "C:\inetpub\wwwroot\secretapp\utils\" | Out-Null
 
+# Copy PDF Images folder
+Write-Host "Copying PDF Images..." -ForegroundColor Yellow
+xcopy /E /Y "C:\Source\Repo\SecretApp\PDF_Images" "C:\inetpub\wwwroot\secretapp\PDF_Images\" | Out-Null
+
 # Copy version.json to site for runtime access
 Write-Host "Copying version info..." -ForegroundColor Yellow
 xcopy /Y "C:\Source\Repo\SecretApp\version.json" "C:\inetpub\wwwroot\secretapp\" | Out-Null
