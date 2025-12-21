@@ -49,7 +49,7 @@ const ImageViewer: React.FC = () => {
   
   // Pagination for file list
   const [page, setPage] = useState(1);
-  const itemsPerPage = 100;
+  const itemsPerPage = 500;
 
   useEffect(() => {
     loadImageFiles();
